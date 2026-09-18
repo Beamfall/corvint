@@ -54,6 +54,6 @@ direction; the separate runtime-parent repair remains unmerged and unrebasable.
 | Requirement | Evidence |
 |---|---|
 | BSD-001, BSD-002 | `TestFrozenRequestIsByteExactAndHasOnlyFourFamilies`, `TestManifestRegistryRejectsCrossProductsAndNofollow` |
-| BSD-003, BSD-005 | `TestBoundReceiptContainsEveryIdentityAndFailure`, `TestUnmappedTupleProducesBoundedNotRunReceipt` |
+| BSD-003, BSD-005 | `TestBoundReceiptContainsEveryIdentityAndFailure`, `TestUnmappedTupleProducesBoundedNotRunReceipt`, `TestDeterministicReplayKeepsBoundIdentities` |
 | BSD-004, BSD-007 | `TestArtifactPassCausalIORatchet`, `TestTimeoutReapsDescendantAndReceiptsCleanup` |
 | BSD-006 | `TestMatrixFixturesAreLiteralDistinctExternalArtifacts` |
