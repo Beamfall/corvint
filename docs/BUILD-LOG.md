@@ -7,6 +7,30 @@ decision IDs it concerns, so `rg -n '^## ' docs/BUILD-LOG.md` is the index.
 The public tree starts this log at the 0.4.0a4 alpha. Entries written before publication are internal
 working records and are referenced from decisions and specifications as historical context only.
 
+## 2026-09-18 EEP-V0 provider-to-impact workflow: synthetic fixture evaluation, and unsupported cases
+
+`TestImpactProviderEvaluation` (`internal/extevidence/extevidence_test.go`) runs the
+provider-to-`impact` composition path (`Section`) over the 5-relation mock fixture
+`internal/extevidence/testdata/mock-provider.json`: 3 relations that must be admitted (one
+`declared` `implements`, one `inferred` `mockdocs:enables`, one `observed` `verifies`) and 2 that
+must be excluded (one `learned` relation, `EEP-V0-007`; one relation from a foreign provider
+endpoint, `EEP-V0-006`). Results on commit `4a2c00f` (`Russells-Mac-Studio.local`, `go1.27.1`):
+precision 1.000 (3 of 3 admitted rows expected), recall 1.000 (3 of 3 expected relations admitted),
+zero false-positive relationships, zero `learned`-evidence admission, abstention accuracy 2 of 2
+(the learned relation reports `excluded` and the foreign-provider relation reports `unresolved`,
+both under `unknowns`, neither admitted), latency about 0.68 ms, and a 3022-byte `context.external`
+section. `TestSelectionEvaluation` was rerun the same day over its existing corpora (63 cases:
+see the two entries below) with the same results already on record. The fixture used here is one
+record with five relations, not an independent corpus; the entries below already exercise a larger,
+independent labelled set for the fail-closed selection profile. This shows the exclusion and
+authority-assignment rules hold on the documented worked example; it is not an adopter outcome.
+
+Unsupported in this slice, per `external-evidence-provider-v0.md` and `external-test-selection-v0.md`:
+command, MCP, and remote provider transports (file transport only); multi-hop obligations beyond one
+relation hop; and checkout worktree inspection for a V1 checkout binding (a checkout's canonical path
+is echoed, never opened). None of these are measured above; none are estimated. The Change Frontier
+sidecar for external obligations landed separately (EFO-V0, entry below) and is not measured here.
+
 ## 2026-09-18 EFO-V0 external obligations sidecar: reference-only join to the frontier
 
 Decision 0313. `corvint obligations --cem FILE --impact FILE` writes `external-frontier-obligations/0`
