@@ -1,5 +1,6 @@
 # Decision records index
 
+| [`0309-external-evidence-provider-file-transport-2026-09-18.md`](0309-external-evidence-provider-file-transport-2026-09-18.md) | accepted, delegated call | External evidence providers start as a file-transport `impact --provider` section (EEP-V0); executed transports, test selection, CEM changes, and cross-repository identities are deferred to their own slices. |
 | [`0294-default-path-latency-may-trade-bounded-cpu-2026-09-14.md`](0294-default-path-latency-may-trade-bounded-cpu-2026-09-14.md) | accepted | Default-path latency candidates may spend up to +5% CPU in overlapped Git children for at least −10% wall; set after H5, H6 is a confirmatory re-measurement. |
 | [`0293-go-1-27-1-toolchain-2026-09-14.md`](0293-go-1-27-1-toolchain-2026-09-14.md) | accepted | Owner moves the exact toolchain pin from go1.27.0 to go1.27.1; every identity check stays exact. |
 | [`0292-retained-installed-release-qualification.md`](0292-retained-installed-release-qualification.md) | proposed technical detail, owner review pending | Implements PUB-V0-016's final retained bundle, real installed host/browser, automatic docs/MCP and planning-roadmap qualification without publication authority. |
