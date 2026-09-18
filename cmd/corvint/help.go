@@ -533,7 +533,9 @@ state is narrow-selection-allowed only when every changed path and every
 entity it reaches is qualified by a fresh, bound, verified verifies or asserts
 relation (covers too under --selection-profile coverage); otherwise it is
 full-relevant-suite-required, blocked, or unknown, with every reason listed.
-Uncommitted paths never qualify. The member never removes a check, never runs a
+Uncommitted paths never qualify. An external-evidence-provider/2 record may
+also relate a test path directly to a changed path (EEP-V2); both sides must
+then be bound, fresh, and verified. The member never removes a check, never runs a
 test, and is absent when no --provider is given. --repository binds a declared
 repository id to a local checkout, as for impact.
 `
@@ -850,6 +852,9 @@ Options:
                              Schema external-evidence-provider/1 (EEP-V1) declares
                              repositories by root-commit origin, evaluates freshness
                              per repository, and qualifies every path endpoint.
+                             Schema external-evidence-provider/2 (EEP-V2) also
+                             composes path-to-path relations into
+                             external.path_relations; under /1 they stay unsupported.
   --repository ID=DIR        Experimental (EEP-V1): bind the record repository ID to
                              the local Git checkout at DIR (its top level). Binding
                              holds only when the declared origin is a root commit of

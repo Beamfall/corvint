@@ -227,7 +227,10 @@ func freshnessOf(ctx context.Context, state *repositoryState, bound *bindings) s
 // view1 resolves one V1 record against its repository states and trees.
 func view1(ctx context.Context, root rootRepository, record Record1, bound *bindings) *view {
 	states, primary := repositoryStates(ctx, record, bound)
-	v := &view{provider: record.Provider.ID, entities: entityMap(record.Entities), primary: primary, repositories: states, trees: map[string]tree{}}
+	v := &view{
+		provider: record.Provider.ID, entities: entityMap(record.Entities), primary: primary, repositories: states, trees: map[string]tree{},
+		pathToPath: record.Schema == Schema2, revision: record.Provider.Revision,
+	}
 	for position := range record.Relations {
 		resolved, failure := v.resolve1(&record.Relations[position])
 		if failure != nil {
@@ -271,7 +274,7 @@ func (v *view) resolve1(relation *Relation1) (link, *unknown) {
 	if reason != "" {
 		return failure(unknownUnresolved, "to: "+reason)
 	}
-	if from.isPath() && to.isPath() {
+	if from.isPath() && to.isPath() && !v.pathToPath {
 		return failure(unknownUnsupported, "path-to-path relations are not composed; relate each path to an entity")
 	}
 	return link{relation: keys, structured: relation, from: from, to: to}, nil

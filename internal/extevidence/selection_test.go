@@ -15,31 +15,55 @@ import (
 )
 
 type selectionCase struct {
-	Name         string   `json:"name"`
-	Record       string   `json:"record"`
-	Profile      string   `json:"profile"`
-	Changed      []string `json:"changed"`
-	Worktree     []string `json:"worktree"`
-	Incomplete   []string `json:"incomplete"`
-	Bind         []string `json:"bind"`
-	State        string   `json:"state"`
-	Codes        []string `json:"codes"`
-	Selected     []string `json:"selected"`
-	Relevant     []string `json:"relevant"`
-	SafeToNarrow bool     `json:"safe_to_narrow"`
+	Name         string            `json:"name"`
+	Record       string            `json:"record"`
+	Values       map[string]string `json:"values"`
+	Profile      string            `json:"profile"`
+	Changed      []string          `json:"changed"`
+	Worktree     []string          `json:"worktree"`
+	Incomplete   []string          `json:"incomplete"`
+	Bind         []string          `json:"bind"`
+	State        string            `json:"state"`
+	Codes        []string          `json:"codes"`
+	Selected     []string          `json:"selected"`
+	Relevant     []string          `json:"relevant"`
+	SafeToNarrow bool              `json:"safe_to_narrow"`
 }
+
+const (
+	selectionFixtures = "conformance-selection"
+	pathFixtures      = "conformance-path"
+)
 
 func selectionCases(t *testing.T) []selectionCase {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "conformance-selection", "cases.json"))
+	return fixtureCases(t, selectionFixtures)
+}
+
+// fixtureCases reads one manifest; its defaults fill any placeholder a case
+// leaves unset.
+func fixtureCases(t *testing.T, dir string) []selectionCase {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", dir, "cases.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		Cases []selectionCase `json:"cases"`
+		Defaults map[string]string `json:"defaults"`
+		Cases    []selectionCase   `json:"cases"`
 	}
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
+	}
+	for i := range manifest.Cases {
+		values := map[string]string{}
+		for key, value := range manifest.Defaults {
+			values[key] = value
+		}
+		for key, value := range manifest.Cases[i].Values {
+			values[key] = value
+		}
+		manifest.Cases[i].Values = values
 	}
 	return manifest.Cases
 }
@@ -48,6 +72,14 @@ func selectionCases(t *testing.T) []selectionCase {
 // source that does not exist, anything else is a V1 selection fixture.
 func selectionRecord(t *testing.T, p pair, name string) string {
 	t.Helper()
+	return fixtureRecord(t, p, selectionFixtures, selectionCase{Record: name})
+}
+
+// fixtureRecord writes a case's record with its own values substituted before
+// the pair's, so a value may itself name a pair placeholder.
+func fixtureRecord(t *testing.T, p pair, fixtures string, c selectionCase) string {
+	t.Helper()
+	name := c.Record
 	dir := t.TempDir()
 	switch name {
 	case "":
@@ -55,11 +87,14 @@ func selectionRecord(t *testing.T, p pair, name string) string {
 	case "v0":
 		return writeRecord(t, dir, "provider.json", fixture(t, p.app.head))
 	}
-	data, err := os.ReadFile(filepath.Join("testdata", "conformance-selection", name))
+	data, err := os.ReadFile(filepath.Join("testdata", fixtures, name))
 	if err != nil {
 		t.Fatal(err)
 	}
-	values := with(with(p.values(), "APP_FIRST", p.app.first), "E2E_FIRST", p.e2e.first)
+	for key, value := range c.Values {
+		data = bytes.ReplaceAll(data, []byte("{{"+key+"}}"), []byte(value))
+	}
+	values := with(with(with(p.values(), "APP_FIRST", p.app.first), "E2E_FIRST", p.e2e.first), "E2E_ORPHAN", p.e2e.orphan)
 	for key, value := range values {
 		data = bytes.ReplaceAll(data, []byte("{{"+key+"}}"), []byte(value))
 	}
@@ -83,10 +118,16 @@ func runSelection(t *testing.T, p pair, source string, checkouts []Checkout, inp
 	return decoded, out
 }
 
+// bindCase binds each id to the e2e checkout, or ID=app to the application
+// root, a checkout of different history.
 func bindCase(p pair, c selectionCase) []Checkout {
 	var checkouts []Checkout
 	for _, id := range c.Bind {
-		checkouts = append(checkouts, Checkout{ID: id, Source: p.e2e.root})
+		source := p.e2e.root
+		if name, found := strings.CutSuffix(id, "=app"); found {
+			id, source = name, p.app.root
+		}
+		checkouts = append(checkouts, Checkout{ID: id, Source: source})
 	}
 	return checkouts
 }
@@ -124,13 +165,26 @@ func selectionCodes(selection map[string]any) map[string]bool {
 	return codes
 }
 
+// allCases pairs every labelled case with its fixture directory: the entity
+// fixtures (ETS-V0) and the independent path-to-path fixture (EEP-V2).
+func allCases(t *testing.T) (cases []selectionCase, dirs []string) {
+	t.Helper()
+	for _, dir := range []string{selectionFixtures, pathFixtures} {
+		for _, c := range fixtureCases(t, dir) {
+			cases, dirs = append(cases, c), append(dirs, dir)
+		}
+	}
+	return cases, dirs
+}
+
 // TestSelectionConformance runs every labelled fixture (ETS-V0-003..006,
-// ETS-V0-008, ETS-V0-011).
+// ETS-V0-008, ETS-V0-011, EEP-V2-006..010).
 func TestSelectionConformance(t *testing.T) {
 	t.Parallel()
 	p := newPair(t)
-	for _, c := range selectionCases(t) {
-		selection, _ := runSelection(t, p, selectionRecord(t, p, c.Record), bindCase(p, c), selectionInput(c))
+	cases, dirs := allCases(t)
+	for i, c := range cases {
+		selection, _ := runSelection(t, p, fixtureRecord(t, p, dirs[i], c), bindCase(p, c), selectionInput(c))
 		if selection["state"] != c.State {
 			t.Errorf("%s: state %v, want %s (reason %v, blocking %v, uncovered %v %v)", c.Name, selection["state"], c.State,
 				selection["state_reason"], selection["blocking_reasons"], selection["uncovered_paths"], selection["uncovered_entities"])
@@ -159,8 +213,9 @@ func TestSelectionEvaluation(t *testing.T) {
 	p := newPair(t)
 	var selected, relevant, unsafe, unsafeDenominator, abstain, abstainCorrect, largest int
 	var latencies []time.Duration
-	for _, c := range selectionCases(t) {
-		source, checkouts := selectionRecord(t, p, c.Record), bindCase(p, c)
+	cases, dirs := allCases(t)
+	for i, c := range cases {
+		source, checkouts := fixtureRecord(t, p, dirs[i], c), bindCase(p, c)
 		started := time.Now()
 		selection, out := runSelection(t, p, source, checkouts, selectionInput(c))
 		latencies = append(latencies, time.Since(started))
@@ -228,10 +283,11 @@ func TestSelectionMandatoryEchoedUnchanged(t *testing.T) {
 	p := newPair(t)
 	mandatory := []any{map[string]any{"command": "make gate", "kind": "mandatory", "reason": "Makefile gate target", "source": "Makefile"}}
 	want, _ := json.Marshal(mandatory)
-	for _, c := range selectionCases(t) {
+	cases, dirs := allCases(t)
+	for i, c := range cases {
 		input := selectionInput(c)
 		input.Mandatory = mandatory
-		selection, _ := runSelection(t, p, selectionRecord(t, p, c.Record), bindCase(p, c), input)
+		selection, _ := runSelection(t, p, fixtureRecord(t, p, dirs[i], c), bindCase(p, c), input)
 		if got, _ := json.Marshal(selection["mandatory"]); !bytes.Equal(got, want) {
 			t.Fatalf("%s: mandatory %s, want %s", c.Name, got, want)
 		}

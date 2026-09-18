@@ -12,6 +12,10 @@ import (
 // Schema1 is the multi-repository record schema (EEP-V1-001).
 const Schema1 = "external-evidence-provider/1"
 
+// Schema2 is the V1 record shape with the path-relation profile opted in: it
+// alone composes path-to-path relations (EEP-V2-001).
+const Schema2 = "external-evidence-provider/2"
+
 // Bounds from EEP-V1-004 and EEP-V1-009.
 const (
 	MaxRepositories = 8
@@ -65,7 +69,7 @@ var (
 	remotePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?(/[A-Za-z0-9._~-]+)+$`)
 )
 
-// Decode1 parses one multi-repository record strictly (EEP-V1-001).
+// Decode1 parses one multi-repository record strictly (EEP-V1-001, EEP-V2-001).
 func Decode1(data []byte) (Record1, error) {
 	var record Record1
 	if len(data) > MaxRecordBytes {
@@ -86,8 +90,8 @@ func Decode1(data []byte) (Record1, error) {
 }
 
 func validate1(record Record1) error {
-	if record.Schema != Schema1 {
-		return fmt.Errorf("schema must be %q", Schema1)
+	if record.Schema != Schema1 && record.Schema != Schema2 {
+		return fmt.Errorf("schema must be %q or %q", Schema1, Schema2)
 	}
 	if err := checkIdentifier("provider.id", record.Provider.ID); err != nil {
 		return err

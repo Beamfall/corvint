@@ -195,3 +195,41 @@ func TestAffectedSelectionArguments(t *testing.T) {
 		t.Error("help must document --selection-profile")
 	}
 }
+
+// EEP-V2-006: a direct path-to-path test relation narrows only under the V2
+// profile; the same relation under V1 stays unsupported and widens.
+func TestAffectedSelectionPathRelation(t *testing.T) {
+	t.Parallel()
+	root, base, _ := affectedSelectionRepository(t)
+	origin := strings.TrimSpace(affectedGit(t, root, "rev-list", "--max-parents=0", "HEAD"))
+	head := strings.TrimSpace(affectedGit(t, root, "rev-parse", "HEAD"))
+	record := func(schema string) string {
+		body := `{"schema":"` + schema + `","provider":{"id":"mockdocs","revision":"1"},
+"repositories":[{"id":"application","origin":"` + origin + `","revision":"` + head + `"}],"entities":[],
+"relations":[{"from":{"repository":"application","path":"core/core_test.go"},"to":{"repository":"application","path":"core/core.go"},"type":"verifies","evidence":"observed","rule":"unit-run","reference":"ci/1"}]}`
+		path := filepath.Join(t.TempDir(), "provider.json")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	advised, _, stderr, code := runAffectedArguments(t, root, "--base", base, "--provider", record("external-evidence-provider/2"))
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	selection := testSelection(t, advised)
+	selected := selection["selected"].([]any)
+	if selection["state"] != "narrow-selection-allowed" || len(selected) != 1 {
+		t.Fatalf("V2 path relation: state %v selected %v", selection["state"], selected)
+	}
+	if row := selected[0].(map[string]any); row["test"].(map[string]any)["path"] != "core/core_test.go" || row["subject"].(map[string]any)["path"] != "core/core.go" {
+		t.Fatalf("path row = %v", row)
+	}
+	legacy, _, stderr, code := runAffectedArguments(t, root, "--base", base, "--provider", record("external-evidence-provider/1"))
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if selection := testSelection(t, legacy); selection["state"] != "full-relevant-suite-required" || len(selection["selected"].([]any)) != 0 {
+		t.Fatalf("V1 path relation must not narrow: %v", selection["state"])
+	}
+}

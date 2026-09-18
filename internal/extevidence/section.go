@@ -53,9 +53,13 @@ func Section(ctx context.Context, index *contextindex.Index, sources []string, c
 		merged.results = append(merged.results, part.results...)
 		merged.downstream = append(merged.downstream, part.downstream...)
 		merged.verification = append(merged.verification, part.verification...)
+		merged.paths = append(merged.paths, part.paths...)
 		merged.unknowns = append(merged.unknowns, part.unknowns...)
 	}
 	section := assemble(providers, merged, limit)
+	if hasPathProfile(providers) {
+		addPathRelations(section, merged.paths, limit)
+	}
 	if bound != nil && len(checkouts) != 0 {
 		section["checkouts"] = bound.checkoutRows(checkoutUse(providers))
 	}
@@ -160,7 +164,7 @@ func load(ctx context.Context, root rootRepository, source string) provider {
 	}
 	digest := sha256.Sum256(data)
 	entry.sha256 = hex.EncodeToString(digest[:])
-	if declaredSchema(data) == Schema1 {
+	if schema := declaredSchema(data); schema == Schema1 || schema == Schema2 {
 		record, err := Decode1(data)
 		if err != nil {
 			entry.state, entry.reason = StateInvalid, err.Error()
@@ -317,10 +321,41 @@ func (entry provider) row1() map[string]any {
 	}
 	return map[string]any{
 		"source": entry.source, "sha256": entry.sha256, "state": entry.state, "reason": entry.reason,
-		"schema": Schema1, "id": record.Provider.ID, "revision": record.Provider.Revision,
+		"schema": record.Schema, "id": record.Provider.ID, "revision": record.Provider.Revision,
 		"root_repository": entry.view.primary, "repositories": repositories,
 		"entities": len(record.Entities), "relations": len(record.Relations),
 	}
+}
+
+// hasPathProfile reports whether any V2 record loaded; only then does the
+// section gain path_relations, so V0 and V1 bytes are unchanged (EEP-V2-005).
+func hasPathProfile(providers []provider) bool {
+	for _, entry := range providers {
+		if entry.view != nil && entry.view.pathToPath {
+			return true
+		}
+	}
+	return false
+}
+
+// addPathRelations adds the bounded, sorted path-to-path items, their omission
+// count, and their untrusted text fields (EEP-V2-004, EEP-V2-005).
+func addPathRelations(section map[string]any, paths []item, limit int) {
+	sort.Slice(paths, func(i, j int) bool { return pathItemKey(paths[i]) < pathItemKey(paths[j]) })
+	kept, omitted := boundItems(paths, limit)
+	section["path_relations"] = kept
+	section["omitted"].(map[string]any)["path_relations"] = omitted
+	section["untrusted_text_fields"] = append(section["untrusted_text_fields"].([]any), "external.path_relations[].relation.rule", "external.path_relations[].relation.reference")
+}
+
+// pathItemKey is a total order over path-to-path items: every relation member
+// and the provider, so record order never reaches the output (EEP-V2-005).
+func pathItemKey(entry item) string {
+	relation := entry.link.structured
+	return strings.Join([]string{
+		endpointKey(relation.From), endpointKey(relation.To), relation.Type, relation.Evidence,
+		relation.Rule, relation.Reference, relation.From.Blob, relation.To.Blob, entry.provider,
+	}, "\x00")
 }
 
 func boundItems(items []item, limit int) ([]any, int) {

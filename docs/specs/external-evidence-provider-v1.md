@@ -12,7 +12,7 @@ Beamfall/corvint#3.
 - Claim: `corvint impact --provider FILE --repository ID=DIR` composes repository-qualified relations across root-commit-identified repositories in `context.external`.
 - Status: accepted (decision 0310, a delegated call on Beamfall/corvint#3)/experimental (file transport only); checked by `TestTwoRepositoryProviderComposes` and `TestImpactProviderV1CrossRepository`.
 - Exists: `internal/extevidence/record1.go` and `repository.go`, the `--repository` option in `cmd/corvint`, and conformance fixtures under `internal/extevidence/testdata/conformance-v1/`.
-- Blocked on: an ACC-V0 provider profile before any executed transport; path-to-path composition is a non-goal of this slice.
+- Blocked on: an ACC-V0 provider profile before any executed transport; path-to-path composition is the opt-in V2 profile (`docs/specs/external-evidence-provider-v2.md`).
 - Read next: Definitions; Requirements; Trust boundary, limits, and failure modes.
 
 ## User and measurable job
@@ -53,8 +53,9 @@ local path, branch name, display name, or record filename is never an identity.
 
 - `EEP-V1-001`: A record whose top-level `schema` is `external-evidence-provider/1` MUST decode
   strictly as V1: UTF-8, one JSON document, no unknown member, at most `MaxRecordBytes`, with
-  `provider`, `repositories`, `entities`, and `relations`. Dispatch reads only `schema`; every
-  other schema value follows `EEP-V0-001` unchanged.
+  `provider`, `repositories`, `entities`, and `relations`. Dispatch reads only `schema`;
+  `external-evidence-provider/2` decodes by the same rules (`EEP-V2-001`), and every other schema
+  value follows `EEP-V0-001` unchanged.
 - `EEP-V1-002`: `repositories` MUST list 1 to 8 entries with unique identifier `id`s, each with a
   `revision`. `origin` and `tree`, when present, MUST be full lowercase hex object ids. `role`, when
   present, MUST be `application`, `test`, `documentation`, `contract`, or `other`. `remote`, when
@@ -105,7 +106,8 @@ local path, branch name, display name, or record filename is never an identity.
   the number of relation sides it bound. The resolved canonical directory is never emitted.
 - `EEP-V1-010`: Cross-repository relations MUST come only from declared records. Core never infers
   one from basenames, route strings, commit messages, remotes, roles, or any other signal. A
-  path-to-path relation is an `unsupported` unknown in this slice.
+  path-to-path relation in a V1 record is an `unsupported` unknown; only a V2 record composes one
+  (`EEP-V2-001`).
 - `EEP-V1-011`: A V0 record, and every run without `--repository`, MUST produce the same section
   bytes as before this slice: no `checkouts`, no V1 provider or item member. With any record, the
   core receipt MUST stay byte-identical to a run without `--provider`.
