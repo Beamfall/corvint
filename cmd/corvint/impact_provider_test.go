@@ -140,6 +140,13 @@ func TestImpactProviderReadOnly(t *testing.T) {
 // and a second, independent e2e repository it creates.
 func providerRecord1(t *testing.T, root string) (record, e2e string) {
 	t.Helper()
+	return providerRecordFixture(t, root, filepath.Join("conformance-v1", "two-repository.json"))
+}
+
+// providerRecordFixture fills one extevidence two-repository fixture against
+// root and a fresh e2e history; a path fixture is filled as V2.
+func providerRecordFixture(t *testing.T, root, fixture string) (record, e2e string) {
+	t.Helper()
 	// An independent history: cliRepository's first commit is deterministic,
 	// so reusing it would give both repositories the same origin.
 	e2e = t.TempDir()
@@ -160,14 +167,14 @@ func providerRecord1(t *testing.T, root string) (record, e2e string) {
 	trim := func(repository string, arguments ...string) string {
 		return strings.TrimSpace(affectedGit(t, repository, arguments...))
 	}
-	data, err := os.ReadFile(filepath.Join("..", "..", "internal", "extevidence", "testdata", "conformance-v1", "two-repository.json"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "internal", "extevidence", "testdata", fixture))
 	if err != nil {
 		t.Fatal(err)
 	}
 	values := map[string]string{
 		"APP_ORIGIN": trim(root, "rev-list", "--max-parents=0", "HEAD"), "APP_REVISION": trim(root, "rev-parse", "HEAD"),
 		"E2E_ORIGIN": trim(e2e, "rev-list", "--max-parents=0", "HEAD"), "E2E_REVISION": trim(e2e, "rev-parse", "HEAD"),
-		"E2E_TREE": trim(e2e, "rev-parse", "HEAD^{tree}"),
+		"E2E_TREE": trim(e2e, "rev-parse", "HEAD^{tree}"), "SCHEMA": "external-evidence-provider/2",
 	}
 	for key, value := range values {
 		data = bytes.ReplaceAll(data, []byte("{{"+key+"}}"), []byte(value))
@@ -245,5 +252,45 @@ func TestImpactProviderV1CrossRepository(t *testing.T) {
 	}
 	if rows := external["checkouts"].([]any); len(rows) != 1 {
 		t.Fatalf("checkouts = %v", rows)
+	}
+}
+
+// EEP-V2-003, EEP-V2-005: a V2 record adds path_relations inside
+// context.external and leaves every core member byte-identical.
+func TestImpactProviderV2PathRelations(t *testing.T) {
+	t.Parallel()
+	root := impactCLIRepository(t)
+	record, e2e := providerRecordFixture(t, root, filepath.Join("conformance-path", "two-repository.json"))
+	code, plain, stderr := runCLI(t, "--root", root, "impact", "pkg/main.go")
+	if code != 0 || stderr != "" {
+		t.Fatalf("plain impact: exit %d stderr %q", code, stderr)
+	}
+	code, withProvider, stderr := runCLI(t, "--root", root, "impact", "--provider", record, "--repository", "e2e="+e2e, "pkg/main.go")
+	if code != 0 || stderr != "" {
+		t.Fatalf("impact --provider V2: exit %d stderr %q", code, stderr)
+	}
+	var plainPayload, providerPayload map[string]any
+	if err := json.Unmarshal([]byte(plain), &plainPayload); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(withProvider), &providerPayload); err != nil {
+		t.Fatal(err)
+	}
+	providerContext := providerPayload["context"].(map[string]any)
+	external := providerContext["external"].(map[string]any)
+	delete(providerContext, "external")
+	left, _ := contextindex.CanonicalJSON(plainPayload)
+	right, _ := contextindex.CanonicalJSON(providerPayload)
+	if !bytes.Equal(left, right) {
+		t.Fatalf("core receipt must be byte-identical with a V2 provider:\n%s\n%s", left, right)
+	}
+	var cross map[string]any
+	for _, raw := range external["path_relations"].([]any) {
+		if entry := raw.(map[string]any); entry["crosses_repositories"] == true {
+			cross = entry
+		}
+	}
+	if cross["relation_state"] != "fresh" || cross["authority"] != "external-provider" || len(cross["endpoints"].([]any)) != 2 {
+		t.Fatalf("cross-repository path relation = %v", cross)
 	}
 }

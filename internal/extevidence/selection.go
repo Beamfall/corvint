@@ -61,6 +61,10 @@ var verificationCodes = map[string]string{
 	VerificationNotVerified: "unbound-test-repository",
 }
 
+// sourceCodes renames a side code when the side is the verified subject of a
+// path-to-path relation rather than its test (EEP-V2-007).
+var sourceCodes = map[string]string{"unbound-test-repository": "unbound-source-repository"}
+
 var unknownCodes = map[string]string{
 	unknownUnresolved: "unresolved-endpoint", unknownUnsupported: "unsupported-relation", unknownExcluded: "excluded-evidence-kind",
 }
@@ -84,10 +88,12 @@ type SelectionInput struct {
 	Limit      int
 }
 
-// obligation is one changed path or affected entity that narrowing must
-// justify. It is covered only when qualified and never blocked.
+// obligation is one changed path, affected entity, or widened path that
+// narrowing must justify. It is covered only when qualified and never blocked.
+// A widened path (EEP-V2-008) carries its record-local repository and path.
 type obligation struct {
 	provider, subject string
+	repository, path  string
 	qualified         bool
 	blocked           bool
 	reasons           map[string]struct{}
@@ -153,6 +159,7 @@ func (s *selector) add(entry provider, v *view) {
 	s.unrooted(v)
 	obligations := s.join(entry, v)
 	s.widen(v, obligations)
+	s.widenPaths(v)
 	for id := range obligations {
 		s.entity(v.provider, id)
 	}
@@ -220,6 +227,36 @@ func (s *selector) widen(v *view, obligations map[string]struct{}) {
 	}
 }
 
+// widenPaths makes the other side of a path-to-path relation on a changed
+// root path a path obligation, one hop, as widen does for entities. Only a V2
+// record composes such a relation, so V0 and V1 never widen here (EEP-V2-008).
+func (s *selector) widenPaths(v *view) {
+	for _, candidate := range v.links {
+		if !candidate.from.isPath() || !candidate.to.isPath() || s.isTestOrContext(candidate) {
+			continue
+		}
+		s.widenPath(v, candidate.from, candidate.to)
+		s.widenPath(v, candidate.to, candidate.from)
+	}
+}
+
+func (s *selector) widenPath(v *view, changed, other endpoint) {
+	if !v.isChanged(changed, s.changed) || s.pathObligation(v, other) != nil {
+		return
+	}
+	key := v.provider + "\x00" + other.repository + "\x00" + other.path
+	s.paths[key] = &obligation{provider: v.provider, subject: other.repository + ":" + other.path, repository: other.repository, path: other.path, reasons: map[string]struct{}{}}
+}
+
+// pathObligation returns the obligation a path endpoint names, if any: a
+// changed root path, or a path an earlier relation widened to.
+func (s *selector) pathObligation(v *view, side endpoint) *obligation {
+	if target := s.paths[side.path]; target != nil && side.repository == v.primary {
+		return target
+	}
+	return s.paths[v.provider+"\x00"+side.repository+"\x00"+side.path]
+}
+
 func (s *selector) isTestOrContext(candidate link) bool {
 	_, verifying := verificationTypes[candidate.relation.Type]
 	_, context := contextTypes[candidate.relation.Type]
@@ -240,6 +277,10 @@ func (s *selector) test(entry provider, v *view, candidate link, obligations map
 	if !s.isTestOrContext(candidate) {
 		return
 	}
+	if candidate.from.isPath() && candidate.to.isPath() {
+		s.pathTest(entry, v, candidate)
+		return
+	}
 	side, entity, ok := pathAndEntity(candidate)
 	if !ok {
 		s.entityTest(entry, v, candidate, obligations)
@@ -256,6 +297,44 @@ func (s *selector) test(entry provider, v *view, candidate link, obligations map
 		return
 	}
 	s.excluded = append(s.excluded, row)
+}
+
+// pathTest evaluates one path-to-path verification or context relation: from
+// is the test, to is the subject it verifies. It folds into every path
+// obligation either side names, and qualifies only when both sides pass
+// (EEP-V2-006, EEP-V2-007).
+func (s *selector) pathTest(entry provider, v *view, candidate link) {
+	var targets []*obligation
+	for _, side := range []endpoint{candidate.from, candidate.to} {
+		if target := s.pathObligation(v, side); target != nil && (len(targets) == 0 || targets[0] != target) {
+			targets = append(targets, target)
+		}
+	}
+	if len(targets) == 0 {
+		return
+	}
+	code := firstCode(
+		func() string { return s.weakCode(candidate.relation.Type, candidate.relation.Evidence) },
+		func() string { return unsupportedCode(candidate.relation.Type) },
+		func() string { return s.sideCode(entry, v, candidate.from) },
+		func() string { return renamed(sourceCodes, s.sideCode(entry, v, candidate.to)) },
+	)
+	for _, target := range targets {
+		s.record(target, code, v.provider, target.subject)
+	}
+	row := s.pathRow(entry, v, candidate, code)
+	if code == "" {
+		s.selected = append(s.selected, row)
+		return
+	}
+	s.excluded = append(s.excluded, row)
+}
+
+func renamed(names map[string]string, code string) string {
+	if name, found := names[code]; found {
+		return name
+	}
+	return code
 }
 
 func (s *selector) entityTest(entry provider, v *view, candidate link, obligations map[string]struct{}) {
@@ -276,14 +355,25 @@ func (s *selector) entityTest(entry provider, v *view, candidate link, obligatio
 // qualify returns "" when the relation meets every ETS-V0-005 condition for
 // its path side, else the first failing condition's code in a fixed order.
 func (s *selector) qualify(entry provider, v *view, candidate link, side endpoint) string {
-	checks := []func() string{
+	return firstCode(
 		func() string { return s.weakCode(candidate.relation.Type, candidate.relation.Evidence) },
 		func() string { return unsupportedCode(candidate.relation.Type) },
+		func() string { return s.sideCode(entry, v, side) },
+	)
+}
+
+// sideCode applies the per-path conditions: identity, binding, freshness,
+// verification, and the root worktree.
+func (s *selector) sideCode(entry provider, v *view, side endpoint) string {
+	return firstCode(
 		func() string { return identityCode(v, side) },
 		func() string { return freshnessCode(entry, v, side) },
 		func() string { return verificationCodes[v.verify(side)] },
 		func() string { return s.worktreeCode(v, side) },
-	}
+	)
+}
+
+func firstCode(checks ...func() string) string {
 	for _, check := range checks {
 		if code := check(); code != "" {
 			return code
@@ -385,35 +475,35 @@ func (s *selector) block(code, provider, subject, detail string) {
 // selection when either raw endpoint names a changed root path or an
 // obligation; an unresolved or unsupported one then blocks what it touches.
 func (s *selector) unknown(v *view, failure unknown, obligations map[string]struct{}) {
-	paths, entities := touched(v, failure, s.changed, obligations)
-	if len(paths)+len(entities) == 0 {
+	targets := s.touched(v, failure, obligations)
+	if len(targets) == 0 {
 		return
 	}
 	code := unknownCodes[failure.state]
 	if weak := s.weakCode(failure.relation.Type, failure.relation.Evidence); weak != "" && failure.state != unknownExcluded {
 		code = weak
 	}
-	for _, path := range paths {
-		s.record(s.paths[path], code, v.provider, path)
-	}
-	for _, id := range entities {
-		s.record(s.entity(v.provider, id), code, v.provider, v.provider+":"+id)
+	for _, target := range targets {
+		s.record(target, code, v.provider, target.subject)
 	}
 	row := failure.toMap()
 	row["code"] = code
 	s.unknowns = append(s.unknowns, selectionRow{key: v.provider + "\x00" + failure.relation.From + "\x00" + failure.relation.To + "\x00" + failure.relation.Type, row: row})
 }
 
-func touched(v *view, failure unknown, changed, obligations map[string]struct{}) (paths, entities []string) {
+// touched lists the obligations an unknown's raw endpoints name: a changed or
+// widened path, or an affected entity of the record's own provider.
+func (s *selector) touched(v *view, failure unknown, obligations map[string]struct{}) []*obligation {
+	var targets []*obligation
 	for _, raw := range rawEndpoints(failure) {
-		if _, isChanged := changed[raw.Path]; raw.Path != "" && isChanged && raw.Repository == v.primary {
-			paths = append(paths, raw.Path)
+		if target := s.pathObligation(v, endpoint{repository: raw.Repository, path: raw.Path}); raw.Path != "" && target != nil {
+			targets = append(targets, target)
 		}
 		if _, affected := obligations[raw.Entity]; raw.Entity != "" && affected && raw.Provider == v.provider {
-			entities = append(entities, raw.Entity)
+			targets = append(targets, s.entity(v.provider, raw.Entity))
 		}
 	}
-	return paths, entities
+	return targets
 }
 
 // rawEndpoints reads an unknown's endpoints in the V1 form; a V0 endpoint is
@@ -466,7 +556,7 @@ func (s *selector) provenance(out map[string]any, entry provider, v *view, side 
 		return
 	}
 	state := v.repositories[side.repository]
-	out["schema"] = Schema1
+	out["schema"] = entry.record1.Schema
 	out["test"].(map[string]any)["repository"] = side.repository
 	out["identity"], out["binding"], out["freshness"] = state.identity, state.binding, state.freshness
 	out["test_revision"] = state.declared.Revision
@@ -481,6 +571,40 @@ func (s *selector) provenance(out map[string]any, entry provider, v *view, side 
 	}
 	out["relation_state"] = worse(RelationFresh, sideState(state, v.verify(side)))
 	out["crosses_repositories"] = side.repository != v.primary
+}
+
+// pathRow is one selected or excluded path-to-path test: both sides carry
+// their own repository evidence, and the relation state is the worse side
+// (EEP-V2-009).
+func (s *selector) pathRow(entry provider, v *view, candidate link, code string) selectionRow {
+	test, subject := candidate.from, candidate.to
+	testState, subjectState := v.repositories[test.repository], v.repositories[subject.repository]
+	testVerification, subjectVerification := v.verify(test), v.verify(subject)
+	out := map[string]any{
+		"authority": Authority, "confidence": confidenceUnscored, "schema": entry.record1.Schema,
+		"provider": v.provider, "provider_revision": entry.providerRevision(),
+		"test":          testState.endpointMap(test, testVerification),
+		"subject":       subjectState.endpointMap(subject, subjectVerification),
+		"relation":      relationMap(candidate.relation, candidate.structured),
+		"relation_type": candidate.relation.Type, "evidence": candidate.relation.Evidence,
+		"verification": testVerification, "limitations": pathLimitations(v, candidate),
+		"identity": testState.identity, "binding": testState.binding, "freshness": testState.freshness,
+		"test_revision": testState.declared.Revision, "source_revision": subjectState.declared.Revision,
+		"relation_state":       worse(sideState(testState, testVerification), sideState(subjectState, subjectVerification)),
+		"crosses_repositories": test.repository != v.primary || subject.repository != v.primary,
+	}
+	if testState.captured != "" {
+		out["captured_revision"] = testState.captured
+	}
+	if code == "" {
+		out["reason"] = fmt.Sprintf("%s %s path-to-path relation from test %s to %s meets every qualifying condition on both sides", candidate.relation.Evidence, candidate.relation.Type, v.label(test), v.label(subject))
+	} else {
+		_, weak := nonBlocking[code]
+		out["code"], out["blocking"] = code, !weak
+		out["reason"] = fmt.Sprintf("%s %s path-to-path relation from test %s to %s does not qualify: %s", candidate.relation.Evidence, candidate.relation.Type, v.label(test), v.label(subject), code)
+	}
+	key := strings.Join([]string{"path:" + v.label(subject), test.repository, test.path, candidate.relation.Type, candidate.relation.Evidence, candidate.relation.From, candidate.relation.To, code, entry.source}, "\x00")
+	return selectionRow{key: key, row: out}
 }
 
 func limitations(v *view, side endpoint) []any {
@@ -531,7 +655,9 @@ func (s *selector) uncovered(obligations map[string]*obligation) []selectionRow 
 		}
 		sort.Strings(reasons)
 		row := map[string]any{"reasons": toAny(reasons), "blocked": target.blocked}
-		if target.provider == "" {
+		if target.repository != "" {
+			row["provider"], row["repository"], row["path"] = target.provider, target.repository, target.path
+		} else if target.provider == "" {
 			row["path"] = target.subject
 		} else {
 			row["provider"], row["entity"] = target.provider, target.subject

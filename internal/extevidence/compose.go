@@ -79,11 +79,15 @@ type view struct {
 	primary      string
 	trees        map[string]tree
 	repositories map[string]*repositoryState
+	// pathToPath is set only for a V2 record, the one schema that composes a
+	// relation between two paths (EEP-V2-001); revision is its provider revision.
+	pathToPath bool
+	revision   string
 }
 
 type composition struct {
-	results, downstream, verification []item
-	unknowns                          []unknown
+	results, downstream, verification, paths []item
+	unknowns                                 []unknown
 }
 
 // compose applies EEP-V0-006, -007, -010, and -011 to one loaded record.
@@ -121,6 +125,7 @@ func composeView(v *view, changed map[string]struct{}) composition {
 		listed[id] = struct{}{}
 	}
 	out.verification = verificationOf(v, changed, listed)
+	out.paths = pathRelationsOf(v, changed)
 	sortItems(out.results)
 	sortItems(out.downstream)
 	sortItems(out.verification)
@@ -292,6 +297,46 @@ func verificationOf(v *view, changed, listed map[string]struct{}) []item {
 	return verification
 }
 
+// pathRelationsOf lists every V2 path-to-path relation with a changed root
+// path on either side (EEP-V2-004). The first changed side anchors the item.
+func pathRelationsOf(v *view, changed map[string]struct{}) []item {
+	var paths []item
+	for _, candidate := range v.links {
+		if !candidate.from.isPath() || !candidate.to.isPath() {
+			continue
+		}
+		anchor, other := candidate.from, candidate.to
+		if !v.isChanged(anchor, changed) {
+			anchor, other = other, anchor
+		}
+		if !v.isChanged(anchor, changed) {
+			continue
+		}
+		annotations := v.annotate(candidate, anchor)
+		annotations["provider_revision"] = v.revision
+		annotations["limitations"] = pathLimitations(v, candidate)
+		paths = append(paths, item{
+			provider: v.provider, path: anchor.path, link: candidate,
+			state:       v.verify(anchor),
+			reason:      fmt.Sprintf("changed path %s related by %s path-to-path relation %s to %s", v.label(anchor), candidate.relation.Evidence, candidate.relation.Type, v.label(other)),
+			annotations: annotations,
+		})
+	}
+	return paths
+}
+
+// pathLimitations names what a path-to-path item does not establish; a side
+// read from a bound checkout was never checked for uncommitted changes.
+func pathLimitations(v *view, candidate link) []any {
+	out := []any{"not-coverage-proof", "not-executed"}
+	for _, side := range []endpoint{candidate.from, candidate.to} {
+		if v.repositories[side.repository].binding == BindingCheckout {
+			return append(out, "checkout-worktree-not-inspected")
+		}
+	}
+	return out
+}
+
 func entitySet(items []item) map[string]struct{} {
 	set := make(map[string]struct{}, len(items))
 	for _, entry := range items {
@@ -340,12 +385,13 @@ func (entry item) toMap() map[string]any {
 	out := map[string]any{
 		"authority":    Authority,
 		"provider":     entry.provider,
-		"entity":       entry.provider + ":" + entry.entity.ID,
-		"kind":         entry.entity.Kind,
-		"summary":      entry.entity.Summary,
 		"relation":     relationMap(entry.link.relation, entry.link.structured),
 		"verification": entry.state,
 		"reason":       entry.reason,
+	}
+	// A path-to-path item names no entity (EEP-V2-004); every other item does.
+	if entry.entity.ID != "" {
+		out["entity"], out["kind"], out["summary"] = entry.provider+":"+entry.entity.ID, entry.entity.Kind, entry.entity.Summary
 	}
 	if entry.path != "" {
 		out["path"] = entry.path

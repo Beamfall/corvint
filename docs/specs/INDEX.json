@@ -656,6 +656,24 @@
     ]
   },
   {
+    "path": "docs/specs/external-evidence-provider-v2.md",
+    "title": "External Evidence Provider V2 — opt-in path-to-path relations",
+    "reqPrefix": "EEP-V2",
+    "intent": "accepted (decision 0312)",
+    "delivery": "experimental (file transport only)",
+    "claim": "An `external-evidence-provider/2` record may relate two repository-qualified paths; each side is verified on its own and the relation takes the worse state.",
+    "dependsOn": [
+      "docs/specs/external-evidence-provider-v1.md",
+      "docs/specs/external-test-selection-v0.md"
+    ],
+    "supersededBy": null,
+    "closableToday": false,
+    "implementation": [
+      "cmd/corvint",
+      "internal/extevidence"
+    ]
+  },
+  {
     "path": "docs/specs/external-test-selection-v0.md",
     "title": "External Test Selection V0 — fail-closed advice from verification relations",
     "reqPrefix": "ETS-V0",
