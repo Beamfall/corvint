@@ -12,12 +12,14 @@ const (
 	VerificationStale       = "stale"
 	VerificationMissing     = "missing"
 	VerificationUnsupported = "unsupported"
+	VerificationNotVerified = "not-verified"
 )
 
 // Unknown states (EEP-V0-006, EEP-V0-007).
 const (
-	unknownUnresolved = "unresolved"
-	unknownExcluded   = "excluded"
+	unknownUnresolved  = "unresolved"
+	unknownExcluded    = "excluded"
+	unknownUnsupported = "unsupported"
 )
 
 var verificationTypes = map[string]struct{}{"verifies": {}, "covers": {}, "asserts": {}}
@@ -30,32 +32,53 @@ type tree struct {
 	blob    func(path string) (string, bool)
 }
 
+// endpoint is a resolved path or entity. repository is empty in V0, where
+// every path belongs to the one root repository.
 type endpoint struct {
-	path   string
-	entity string
+	repository string
+	path       string
+	entity     string
+	blob       string
 }
 
 func (e endpoint) isPath() bool { return e.path != "" }
 
+// link is a resolved relation. For a V1 record, relation carries the ordering
+// keys and structured holds the record's own endpoints for output.
 type link struct {
-	relation Relation
-	from, to endpoint
+	relation   Relation
+	structured *Relation1
+	from, to   endpoint
 }
 
 type item struct {
-	provider string
-	entity   Entity
-	path     string
-	link     link
-	state    string
-	reason   string
+	provider    string
+	entity      Entity
+	path        string
+	link        link
+	state       string
+	reason      string
+	annotations map[string]any
 }
 
 type unknown struct {
-	provider string
-	relation Relation
-	state    string
-	reason   string
+	provider   string
+	relation   Relation
+	structured *Relation1
+	state      string
+	reason     string
+}
+
+// view is one loaded record in the form composition reads. primary names the
+// repository the changed paths belong to; repositories is nil for V0.
+type view struct {
+	provider     string
+	entities     map[string]Entity
+	links        []link
+	unknowns     []unknown
+	primary      string
+	trees        map[string]tree
+	repositories map[string]*repositoryState
 }
 
 type composition struct {
@@ -65,27 +88,39 @@ type composition struct {
 
 // compose applies EEP-V0-006, -007, -010, and -011 to one loaded record.
 func compose(record Record, changed map[string]struct{}, repository tree) composition {
-	entities := make(map[string]Entity, len(record.Entities))
-	for _, entity := range record.Entities {
-		entities[entity.ID] = entity
-	}
-	var out composition
-	links := make([]link, 0, len(record.Relations))
+	return composeView(viewOf(record, repository), changed)
+}
+
+func viewOf(record Record, repository tree) *view {
+	v := &view{provider: record.Provider.ID, entities: entityMap(record.Entities), trees: map[string]tree{"": repository}}
 	for _, relation := range record.Relations {
-		resolved, failure := resolve(record, entities, relation)
+		resolved, failure := resolve(record, v.entities, relation)
 		if failure != nil {
-			out.unknowns = append(out.unknowns, *failure)
+			v.unknowns = append(v.unknowns, *failure)
 			continue
 		}
-		links = append(links, resolved)
+		v.links = append(v.links, resolved)
 	}
-	out.results = directResults(record, entities, links, changed, repository)
+	return v
+}
+
+func entityMap(list []Entity) map[string]Entity {
+	entities := make(map[string]Entity, len(list))
+	for _, entity := range list {
+		entities[entity.ID] = entity
+	}
+	return entities
+}
+
+func composeView(v *view, changed map[string]struct{}) composition {
+	out := composition{unknowns: v.unknowns}
+	out.results = directResults(v, changed)
 	listed := entitySet(out.results)
-	out.downstream = downstreamOf(record, entities, links, listed)
+	out.downstream = downstreamOf(v, listed)
 	for id := range entitySet(out.downstream) {
 		listed[id] = struct{}{}
 	}
-	out.verification = verificationOf(record, entities, links, changed, listed, repository)
+	out.verification = verificationOf(v, changed, listed)
 	sortItems(out.results)
 	sortItems(out.downstream)
 	sortItems(out.verification)
@@ -100,20 +135,20 @@ func resolve(record Record, entities map[string]Entity, relation Relation) (link
 			reason: fmt.Sprintf("evidence kind %q is not declared, observed, or inferred", relation.Evidence),
 		}
 	}
-	from, reason := parseEndpoint(record, entities, relation.From)
+	from, reason := parseEndpoint(record, entities, relation.From, relation)
 	if reason != "" {
 		return link{}, &unknown{provider: record.Provider.ID, relation: relation, state: unknownUnresolved, reason: "from: " + reason}
 	}
-	to, reason := parseEndpoint(record, entities, relation.To)
+	to, reason := parseEndpoint(record, entities, relation.To, relation)
 	if reason != "" {
 		return link{}, &unknown{provider: record.Provider.ID, relation: relation, state: unknownUnresolved, reason: "to: " + reason}
 	}
 	return link{relation: relation, from: from, to: to}, nil
 }
 
-func parseEndpoint(record Record, entities map[string]Entity, raw string) (endpoint, string) {
+func parseEndpoint(record Record, entities map[string]Entity, raw string, relation Relation) (endpoint, string) {
 	if path, isPath := strings.CutPrefix(raw, "path:"); isPath {
-		return endpoint{path: path}, checkPath(path)
+		return endpoint{path: path, blob: relation.Blob}, checkPath(path)
 	}
 	provider, id, found := strings.Cut(raw, ":")
 	if !found {
@@ -143,7 +178,14 @@ func checkPath(path string) string {
 	return ""
 }
 
-func verify(repository tree, path, pinned string) string {
+// verify checks one path endpoint in its own repository; a repository that
+// is not bound to a checkout cannot be verified (EEP-V1-007).
+func (v *view) verify(target endpoint) string {
+	repository, bound := v.trees[target.repository]
+	if !bound {
+		return VerificationNotVerified
+	}
+	path, pinned := target.path, target.blob
 	if !repository.tracked(path) {
 		return VerificationMissing
 	}
@@ -159,38 +201,49 @@ func verify(repository tree, path, pinned string) string {
 
 // pathAndEntity splits a link into its path side and entity side when it has
 // exactly one of each.
-func pathAndEntity(candidate link) (path, entity string, ok bool) {
+func pathAndEntity(candidate link) (path endpoint, entity string, ok bool) {
 	if candidate.from.isPath() && !candidate.to.isPath() {
-		return candidate.from.path, candidate.to.entity, true
+		return candidate.from, candidate.to.entity, true
 	}
 	if !candidate.from.isPath() && candidate.to.isPath() {
-		return candidate.to.path, candidate.from.entity, true
+		return candidate.to, candidate.from.entity, true
 	}
-	return "", "", false
+	return endpoint{}, "", false
 }
 
-func directResults(record Record, entities map[string]Entity, links []link, changed map[string]struct{}, repository tree) []item {
+// isChanged reports whether a path endpoint is a requested changed path;
+// changed paths belong only to the primary repository.
+func (v *view) isChanged(target endpoint, changed map[string]struct{}) bool {
+	if target.repository != v.primary {
+		return false
+	}
+	_, isChanged := changed[target.path]
+	return isChanged
+}
+
+func directResults(v *view, changed map[string]struct{}) []item {
 	var results []item
-	for _, candidate := range links {
+	for _, candidate := range v.links {
 		path, entity, ok := pathAndEntity(candidate)
 		if !ok {
 			continue
 		}
-		if _, isChanged := changed[path]; !isChanged {
+		if !v.isChanged(path, changed) {
 			continue
 		}
 		results = append(results, item{
-			provider: record.Provider.ID, entity: entities[entity], path: path, link: candidate,
-			state:  verify(repository, path, candidate.relation.Blob),
-			reason: fmt.Sprintf("changed path %s joined by %s relation %s", path, candidate.relation.Evidence, candidate.relation.Type),
+			provider: v.provider, entity: v.entities[entity], path: path.path, link: candidate,
+			state:       v.verify(path),
+			reason:      fmt.Sprintf("changed path %s joined by %s relation %s", v.label(path), candidate.relation.Evidence, candidate.relation.Type),
+			annotations: v.annotate(candidate, path),
 		})
 	}
 	return results
 }
 
-func downstreamOf(record Record, entities map[string]Entity, links []link, results map[string]struct{}) []item {
+func downstreamOf(v *view, results map[string]struct{}) []item {
 	var downstream []item
-	for _, candidate := range links {
+	for _, candidate := range v.links {
 		if candidate.from.isPath() || candidate.to.isPath() {
 			continue
 		}
@@ -205,16 +258,17 @@ func downstreamOf(record Record, entities map[string]Entity, links []link, resul
 			continue
 		}
 		downstream = append(downstream, item{
-			provider: record.Provider.ID, entity: entities[next], link: candidate, state: VerificationUnsupported,
-			reason: fmt.Sprintf("one %s relation %s from result entity %s:%s", candidate.relation.Evidence, candidate.relation.Type, record.Provider.ID, origin),
+			provider: v.provider, entity: v.entities[next], link: candidate, state: VerificationUnsupported,
+			reason:      fmt.Sprintf("one %s relation %s from result entity %s:%s", candidate.relation.Evidence, candidate.relation.Type, v.provider, origin),
+			annotations: v.annotate(candidate, endpoint{}),
 		})
 	}
 	return downstream
 }
 
-func verificationOf(record Record, entities map[string]Entity, links []link, changed, listed map[string]struct{}, repository tree) []item {
+func verificationOf(v *view, changed, listed map[string]struct{}) []item {
 	var verification []item
-	for _, candidate := range links {
+	for _, candidate := range v.links {
 		if _, verifying := verificationTypes[candidate.relation.Type]; !verifying {
 			continue
 		}
@@ -222,16 +276,17 @@ func verificationOf(record Record, entities map[string]Entity, links []link, cha
 		if !ok {
 			continue
 		}
-		if _, isChanged := changed[path]; isChanged {
+		if v.isChanged(path, changed) {
 			continue
 		}
 		if _, isListed := listed[entity]; !isListed {
 			continue
 		}
 		verification = append(verification, item{
-			provider: record.Provider.ID, entity: entities[entity], path: path, link: candidate,
-			state:  verify(repository, path, candidate.relation.Blob),
-			reason: fmt.Sprintf("%s relation %s from path %s to listed entity %s:%s", candidate.relation.Evidence, candidate.relation.Type, path, record.Provider.ID, entity),
+			provider: v.provider, entity: v.entities[entity], path: path.path, link: candidate,
+			state:       v.verify(path),
+			reason:      fmt.Sprintf("%s relation %s from path %s to listed entity %s:%s", candidate.relation.Evidence, candidate.relation.Type, v.label(path), v.provider, entity),
+			annotations: v.annotate(candidate, path),
 		})
 	}
 	return verification
@@ -264,7 +319,13 @@ func lessRelation(a, b Relation) bool {
 	return a.Type < b.Type
 }
 
-func relationMap(relation Relation) map[string]any {
+func relationMap(relation Relation, structured *Relation1) map[string]any {
+	if structured != nil {
+		return map[string]any{
+			"from": endpointMap(structured.From), "to": endpointMap(structured.To), "type": structured.Type,
+			"evidence": structured.Evidence, "rule": structured.Rule, "reference": structured.Reference,
+		}
+	}
 	out := map[string]any{
 		"from": relation.From, "to": relation.To, "type": relation.Type,
 		"evidence": relation.Evidence, "rule": relation.Rule, "reference": relation.Reference,
@@ -282,21 +343,28 @@ func (entry item) toMap() map[string]any {
 		"entity":       entry.provider + ":" + entry.entity.ID,
 		"kind":         entry.entity.Kind,
 		"summary":      entry.entity.Summary,
-		"relation":     relationMap(entry.link.relation),
+		"relation":     relationMap(entry.link.relation, entry.link.structured),
 		"verification": entry.state,
 		"reason":       entry.reason,
 	}
 	if entry.path != "" {
 		out["path"] = entry.path
 	}
+	for key, value := range entry.annotations {
+		out[key] = value
+	}
 	return out
 }
 
 func (entry unknown) toMap() map[string]any {
+	relation := map[string]any{"from": entry.relation.From, "to": entry.relation.To, "type": entry.relation.Type, "evidence": entry.relation.Evidence}
+	if entry.structured != nil {
+		relation["from"], relation["to"] = endpointMap(entry.structured.From), endpointMap(entry.structured.To)
+	}
 	return map[string]any{
 		"authority": Authority,
 		"provider":  entry.provider,
-		"relation":  map[string]any{"from": entry.relation.From, "to": entry.relation.To, "type": entry.relation.Type, "evidence": entry.relation.Evidence},
+		"relation":  relation,
 		"state":     entry.state,
 		"reason":    entry.reason,
 	}

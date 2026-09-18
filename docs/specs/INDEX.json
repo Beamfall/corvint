@@ -639,6 +639,23 @@
     ]
   },
   {
+    "path": "docs/specs/external-evidence-provider-v1.md",
+    "title": "External Evidence Provider V1 — repository identity",
+    "reqPrefix": "EEP-V1",
+    "intent": "accepted (decision 0310)",
+    "delivery": "experimental (file transport only)",
+    "claim": "`corvint impact --provider FILE --repository ID=DIR` composes repository-qualified relations across root-commit-identified repositories in `context.external`.",
+    "dependsOn": [
+      "docs/specs/external-evidence-provider-v0.md"
+    ],
+    "supersededBy": null,
+    "closableToday": false,
+    "implementation": [
+      "cmd/corvint",
+      "internal/extevidence"
+    ]
+  },
+  {
     "path": "docs/specs/experimental-source-views-v0.md",
     "title": "Experimental caller-selected source views V0",
     "reqPrefix": "ESV-V0",

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -132,5 +133,117 @@ func TestImpactProviderReadOnly(t *testing.T) {
 	after, err := os.ReadFile(record)
 	if err != nil || !bytes.Equal(before, after) {
 		t.Fatal("provider record bytes must be untouched")
+	}
+}
+
+// providerRecord1 fills the two-repository V1 conformance fixture against root
+// and a second, independent e2e repository it creates.
+func providerRecord1(t *testing.T, root string) (record, e2e string) {
+	t.Helper()
+	// An independent history: cliRepository's first commit is deterministic,
+	// so reusing it would give both repositories the same origin.
+	e2e = t.TempDir()
+	affectedGit(t, e2e, "init", "-q")
+	affectedGit(t, e2e, "config", "user.email", "corvint@example.test")
+	affectedGit(t, e2e, "config", "user.name", "Corvint Test")
+	for _, name := range []string{"account", "journey"} {
+		file := filepath.Join(e2e, "tests", name+".spec.ts")
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte("test('"+name+"')\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	affectedGit(t, e2e, "add", ".")
+	affectedGit(t, e2e, "commit", "-qm", "add e2e tests")
+	trim := func(repository string, arguments ...string) string {
+		return strings.TrimSpace(affectedGit(t, repository, arguments...))
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", "internal", "extevidence", "testdata", "conformance-v1", "two-repository.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]string{
+		"APP_ORIGIN": trim(root, "rev-list", "--max-parents=0", "HEAD"), "APP_REVISION": trim(root, "rev-parse", "HEAD"),
+		"E2E_ORIGIN": trim(e2e, "rev-list", "--max-parents=0", "HEAD"), "E2E_REVISION": trim(e2e, "rev-parse", "HEAD"),
+		"E2E_TREE": trim(e2e, "rev-parse", "HEAD^{tree}"),
+	}
+	for key, value := range values {
+		data = bytes.ReplaceAll(data, []byte("{{"+key+"}}"), []byte(value))
+	}
+	record = filepath.Join(t.TempDir(), "two-repository.json")
+	if err := os.WriteFile(record, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return record, e2e
+}
+
+func TestImpactRepositoryFlagParsing(t *testing.T) {
+	t.Parallel()
+	parsed, err := parseImpactArgumentsForPlatform(options{impactLimit: 10}, []string{"--provider", "a.json", "--repository", "e2e=../e2e", "--repository=docs=/srv/docs", "pkg/main.go"}, "darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed.impactCheckouts) != 2 || parsed.impactCheckouts[0].ID != "e2e" || parsed.impactCheckouts[1].Source != "/srv/docs" {
+		t.Fatalf("checkouts = %+v", parsed.impactCheckouts)
+	}
+	ninth := []string{"--provider", "a.json"}
+	for index := 0; index < 9; index++ {
+		ninth = append(ninth, "--repository", "r"+strconv.Itoa(index)+"=d")
+	}
+	refusals := map[string][]string{
+		"missing value":      {"--provider", "a.json", "pkg/main.go", "--repository"},
+		"no separator":       {"--provider", "a.json", "--repository", "e2e", "pkg/main.go"},
+		"empty directory":    {"--provider", "a.json", "--repository", "e2e=", "pkg/main.go"},
+		"bound twice":        {"--provider", "a.json", "--repository", "e2e=a", "--repository", "e2e=b", "pkg/main.go"},
+		"without --provider": {"--repository", "e2e=../e2e", "pkg/main.go"},
+		"ninth checkout":     append(ninth, "pkg/main.go"),
+	}
+	for name, arguments := range refusals {
+		if _, err := parseImpactArgumentsForPlatform(options{impactLimit: 10}, arguments, "darwin"); err == nil {
+			t.Errorf("%s: expected an argument error", name)
+		}
+	}
+}
+
+func TestImpactProviderV1CrossRepository(t *testing.T) {
+	t.Parallel()
+	root := impactCLIRepository(t)
+	record, e2e := providerRecord1(t, root)
+	code, plain, stderr := runCLI(t, "--root", root, "impact", "pkg/main.go")
+	if code != 0 || stderr != "" {
+		t.Fatalf("plain impact: exit %d stderr %q", code, stderr)
+	}
+	code, withProvider, stderr := runCLI(t, "--root", root, "impact", "--provider", record, "--repository", "e2e="+e2e, "pkg/main.go")
+	if code != 0 || stderr != "" {
+		t.Fatalf("impact --provider --repository: exit %d stderr %q", code, stderr)
+	}
+	var plainPayload, providerPayload map[string]any
+	if err := json.Unmarshal([]byte(plain), &plainPayload); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(withProvider), &providerPayload); err != nil {
+		t.Fatal(err)
+	}
+	providerContext := providerPayload["context"].(map[string]any)
+	external := providerContext["external"].(map[string]any)
+	delete(providerContext, "external")
+	left, _ := contextindex.CanonicalJSON(plainPayload)
+	right, _ := contextindex.CanonicalJSON(providerPayload)
+	if !bytes.Equal(left, right) {
+		t.Fatalf("core receipt must be byte-identical with a V1 provider:\n%s\n%s", left, right)
+	}
+	var cross map[string]any
+	for _, raw := range external["verification"].([]any) {
+		if entry := raw.(map[string]any); entry["path"] == "tests/account.spec.ts" {
+			cross = entry
+		}
+	}
+	if cross["repository"] != "e2e" || cross["crosses_repositories"] != true || cross["relation_state"] != "fresh" || cross["authority"] != "external-provider" {
+		t.Fatalf("cross-repository verification = %v", cross)
+	}
+	if rows := external["checkouts"].([]any); len(rows) != 1 {
+		t.Fatalf("checkouts = %v", rows)
 	}
 }

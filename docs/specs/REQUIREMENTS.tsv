@@ -598,6 +598,20 @@ EEP-V0-012	docs/specs/external-evidence-provider-v0.md	110	Bounds: at most four 
 EEP-V0-013	docs/specs/external-evidence-provider-v0.md	113	`summary`, `rule`, `reference`, and `reason` text from a record MUST be valid
 EEP-V0-014	docs/specs/external-evidence-provider-v0.md	116	`impact --provider` reads the record and Git and writes no repository, index, or
 EEP-V0-015	docs/specs/external-evidence-provider-v0.md	118	External items never enter `context.results`, ranking, learning, a CEM, an OCM,
+EEP-V1-001	docs/specs/external-evidence-provider-v1.md	54	A record whose top-level `schema` is `external-evidence-provider/1` MUST decode
+EEP-V1-002	docs/specs/external-evidence-provider-v1.md	58	`repositories` MUST list 1 to 8 entries with unique identifier `id`s, each with
+EEP-V1-003	docs/specs/external-evidence-provider-v1.md	64	An endpoint MUST be exactly one of the two shapes in Definitions. A mixed, strin
+EEP-V1-004	docs/specs/external-evidence-provider-v1.md	68	Identity MUST be evaluated per declared repository: `unresolved` without an
+EEP-V1-005	docs/specs/external-evidence-provider-v1.md	71	Binding MUST be evaluated per declared repository:
+EEP-V1-006	docs/specs/external-evidence-provider-v1.md	82	Freshness MUST be evaluated per repository against its bound `HEAD` with the
+EEP-V1-007	docs/specs/external-evidence-provider-v1.md	87	A path endpoint MUST be verified in its own repository with the `EEP-V0-010`
+EEP-V1-008	docs/specs/external-evidence-provider-v1.md	90	Every V1 item MUST carry `repository`, `endpoints`, `relation_state`, and
+EEP-V1-009	docs/specs/external-evidence-provider-v1.md	102	`--repository ID=DIR` MAY repeat up to 8 times, each ID at most once, and only
+EEP-V1-010	docs/specs/external-evidence-provider-v1.md	106	Cross-repository relations MUST come only from declared records. Core never infe
+EEP-V1-011	docs/specs/external-evidence-provider-v1.md	109	A V0 record, and every run without `--repository`, MUST produce the same section
+EEP-V1-012	docs/specs/external-evidence-provider-v1.md	112	Section composition, ordering, the `--limit` bound, and omission counts follow
+EEP-V1-013	docs/specs/external-evidence-provider-v1.md	114	No failure MAY surface as empty success. A missing, conflicting, or ambiguous
+EEP-V1-014	docs/specs/external-evidence-provider-v1.md	118	The section MUST carry no credential, file body, or resolved local path, and
 EPG-V0-001	docs/specs/eol-policy-gate-v0.md	47	The gate MUST resolve the repository root from its own location, change to that
 EPG-V0-002	docs/specs/eol-policy-gate-v0.md	51	The gate MUST split each record at its first tab into the EOL fields and path, f
 EPG-V0-003	docs/specs/eol-policy-gate-v0.md	55	Every tracked path MUST report the exact attribute value `attr/-text`. Any other

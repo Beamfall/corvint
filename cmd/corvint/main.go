@@ -48,6 +48,7 @@ type options struct {
 	impactPaths     []string
 	impactRawPaths  []string
 	impactProviders []string
+	impactCheckouts []extevidence.Checkout
 	impactLimit     int
 	impactWorktree  bool
 	impactBase      string
@@ -386,6 +387,31 @@ func parseImpactArgumentsForPlatform(result options, arguments []string, platfor
 			result.impactProviders = append(result.impactProviders, value)
 			continue
 		}
+		if !positionalOnly && name == "--repository" {
+			if !inline {
+				if index+1 >= len(arguments) || argparseOptionLike(arguments[index+1]) {
+					return result, argumentError("argument --repository: expected one argument")
+				}
+				value = arguments[index+1]
+				index += 2
+			} else {
+				index++
+			}
+			checkout, err := extevidence.ParseCheckout(value)
+			if err != nil {
+				return result, argumentError("argument --repository: " + err.Error())
+			}
+			if len(result.impactCheckouts) == extevidence.MaxCheckouts {
+				return result, argumentError(fmt.Sprintf("argument --repository: at most %d checkouts", extevidence.MaxCheckouts))
+			}
+			for _, earlier := range result.impactCheckouts {
+				if earlier.ID == checkout.ID {
+					return result, argumentError("argument --repository: repository id " + pythonRepr(checkout.ID) + " is bound twice")
+				}
+			}
+			result.impactCheckouts = append(result.impactCheckouts, checkout)
+			continue
+		}
 		if !positionalOnly && strings.HasPrefix(argument, "-") {
 			return result, argumentError("unrecognized arguments: " + argument)
 		}
@@ -399,6 +425,9 @@ func parseImpactArgumentsForPlatform(result options, arguments []string, platfor
 		result.impactPaths = append(result.impactPaths, normalized)
 		result.impactRawPaths = append(result.impactRawPaths, argument)
 		index++
+	}
+	if len(result.impactCheckouts) != 0 && len(result.impactProviders) == 0 {
+		return result, argumentError("--repository requires --provider")
 	}
 	if len(result.impactProviders) != 0 && (result.impactBaseSet || result.impactWorktree) {
 		return result, argumentError("--provider is available only for the default path profile, not --base or --working-tree-untracked")
@@ -1049,7 +1078,7 @@ func runContext(ctx context.Context, arguments []string, stdin io.Reader, stdout
 			}
 			// EEP-V0-003: provider output lives only under `external`; every
 			// other member is exactly what the run without --provider produced.
-			contextReceipt["external"] = extevidence.Section(ctx, index, options.impactProviders, options.impactPaths, options.impactLimit)
+			contextReceipt["external"] = extevidence.Section(ctx, index, options.impactProviders, options.impactCheckouts, options.impactPaths, options.impactLimit)
 			return contextReceipt, nil
 		}
 		// Path impact and feature read the snapshot on the terms of

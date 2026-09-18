@@ -801,7 +801,8 @@ Recovery for unsupported-query-trace-state:
 const impactHelp = `Compile experimental impact evidence for index-admitted paths.
 
 Usage:
-  corvint [--root PATH] impact [--limit N] [--provider FILE]... PATH...
+  corvint [--root PATH] impact [--limit N] [--provider FILE]...
+    [--repository ID=DIR]... PATH...
   corvint [--root PATH] impact --working-tree-untracked [--limit N] PATH...
   corvint [--root PATH] impact --base FULL_COMMIT_ID [--limit N]
     [--range-profile expanded-256]
@@ -833,6 +834,13 @@ Options:
                              up to 4 times; a relative FILE resolves against --root;
                              default path profile only. Provider items carry
                              authority "external-provider" and never enter results.
+                             Schema external-evidence-provider/1 (EEP-V1) declares
+                             repositories by root-commit origin, evaluates freshness
+                             per repository, and qualifies every path endpoint.
+  --repository ID=DIR        Experimental (EEP-V1): bind the record repository ID to
+                             the local Git checkout at DIR (its top level). Binding
+                             holds only when the declared origin is a root commit of
+                             DIR's HEAD. Repeat up to 8 times; requires --provider.
   --                         Treat all remaining arguments as paths.
 
 Requirements:
