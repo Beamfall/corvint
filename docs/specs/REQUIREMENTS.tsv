@@ -625,6 +625,15 @@ EEP-V2-010	docs/specs/external-evidence-provider-v2.md	88	Path rows and items MU
 EEP-V2-011	docs/specs/external-evidence-provider-v2.md	91	The conformance corpus MUST include an independent two-repository path fixture w
 EEP-V2-012	docs/specs/external-evidence-provider-v2.md	95	A V2 directory-scope endpoint MUST NOT pin a blob; such a record is invalid. As
 EEP-V2-013	docs/specs/external-evidence-provider-v2.md	104	A non-verification, non-context path relation whose scope endpoint holds a chang
+EFO-V0-001	docs/specs/external-frontier-obligations-v0.md	56	`corvint obligations` MUST accept `--cem FILE` and `--impact FILE` (both require
+EFO-V0-002	docs/specs/external-frontier-obligations-v0.md	61	The CEM input MUST decode as a `cem/0.2` document (only `hunks[].id`,
+EFO-V0-003	docs/specs/external-frontier-obligations-v0.md	66	The sidecar has exactly the members `schema`, `id`, `authority`, `state`,
+EFO-V0-004	docs/specs/external-frontier-obligations-v0.md	74	`hunks` has one row per CEM hunk in CEM order with `hunk` (the CEM hunk id),
+EFO-V0-005	docs/specs/external-frontier-obligations-v0.md	79	Every non-unknown association carries `authority` `external-provider`, `provider
+EFO-V0-006	docs/specs/external-frontier-obligations-v0.md	84	A hunk with no `entity` association carries one `unknown` with code
+EFO-V0-007	docs/specs/external-frontier-obligations-v0.md	89	The sidecar MUST NOT change any other surface: `corvint frontier` neither accept
+EFO-V0-008	docs/specs/external-frontier-obligations-v0.md	92	Associations sort by kind order then a total key over provider, entity, path, co
+EFO-V0-009	docs/specs/external-frontier-obligations-v0.md	96	The sidecar carries no file body, credential, or resolved checkout directory, an
 EPG-V0-001	docs/specs/eol-policy-gate-v0.md	47	The gate MUST resolve the repository root from its own location, change to that
 EPG-V0-002	docs/specs/eol-policy-gate-v0.md	51	The gate MUST split each record at its first tab into the EOL fields and path, f
 EPG-V0-003	docs/specs/eol-policy-gate-v0.md	55	Every tracked path MUST report the exact attribute value `attr/-text`. Any other

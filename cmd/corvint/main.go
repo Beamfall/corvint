@@ -722,7 +722,7 @@ var (
 	// adds are appended in the order rootHelp documents them.
 	topLevelCommands = []string{"init", "adopt", "query", "feature", "impact", "eval", "lrf",
 		"record", "migrate-traces", "harness", "cem", "ocm", "work", "context", "adapter",
-		"dogfood", "dogfood-ocm", "frontier", "observations", "affected", "prove", "prove-observe",
+		"dogfood", "dogfood-ocm", "frontier", "observations", "affected", "obligations", "prove", "prove-observe",
 		"index", "batch", "docs", "depsource", "necessity", "surprise", "answerability",
 		"kernel", "lease", "reads", "calibrate", "witness", "test-validity", "features", "overview", "review"}
 )
@@ -920,6 +920,13 @@ func runContext(ctx context.Context, arguments []string, stdin io.Reader, stdout
 				return 2
 			}
 			return runAffected(ctx, root, stdout, stderr)
+		}
+		if options, isObligations, obligationsErr := parseObligationsInvocation(arguments); isObligations {
+			if obligationsErr != nil {
+				emitError(stderr, obligationsErr)
+				return 2
+			}
+			return runObligations(options, stdout, stderr)
 		}
 		if root, isBatch, batchErr := parseBatchInvocation(arguments); isBatch {
 			if batchErr != nil {
