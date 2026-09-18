@@ -12,7 +12,7 @@ Authoritative inputs: `AGENTS.md`, `docs/SPEC-DRIVEN-DEVELOPMENT.md`,
 - Claim: `corvint impact --provider FILE` attaches provider records in a separated `context.external` section and changes nothing in the core receipt.
 - Status: accepted (decision 0309, a delegated call on Beamfall/corvint#1)/experimental (file transport only); checked by `TestImpactProviderSectionSeparation`.
 - Exists: `internal/extevidence` and the `--provider` option in `cmd/corvint`; provider items carry the Core-assigned `external-provider` authority, Git-ancestry freshness, and per-path reference verification.
-- Blocked on: an ACC-V0 provider profile before any command, MCP, or remote transport; a repository-identity decision before any cross-repository relationship.
+- Blocked on: an ACC-V0 provider profile before any command, MCP, or remote transport. Cross-repository relationships are `external-evidence-provider-v1.md` (decision 0310).
 - Read next: Definitions; Requirements; Non-goals and simpler baseline.
 
 ## User and measurable job
@@ -83,7 +83,7 @@ each cited path still exists at that revision, and what was omitted or could not
   An endpoint with neither prefix, a path outside those bounds, an entity endpoint whose provider
   id differs from the record's own, or an entity id the record does not declare makes that relation
   `unresolved`: it is listed under `unknowns` with a reason and contributes nothing else.
-  V0 defines no cross-repository identity.
+  V0 defines no cross-repository identity; `EEP-V1` does.
 - `EEP-V0-007`: A relation's `evidence` MUST be `declared`, `observed`, or `inferred`. Any other
   value, including `learned`, excludes that relation to `unknowns` with a reason. Every item in the
   section carries `authority` `external-provider`, assigned by Core; a record cannot state an
@@ -123,7 +123,7 @@ each cited path still exists at that revision, and what was omitted or could not
 - Command, MCP, and remote transports. A provider that must be executed joins later as a profile
   family under the Analyzer Capability Contract; the file transport is the baseline that already
   lets a third-party project participate without touching Core.
-- Repository identities and cross-repository relationships.
+- Repository identities and cross-repository relationships, delivered by `external-evidence-provider-v1.md`.
 - Test selection. The fail-closed selection the request asks for extends the affected plan's
   advice member in its own slice.
 - Any CEM wire change. External obligations become a Change Frontier sidecar input in their own

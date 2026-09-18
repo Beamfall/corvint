@@ -9,6 +9,9 @@ updated: 2026-09-18
 Future features and larger directions. Promote to `docs/specs/` when an idea matures; remove the entry once promoted or shipped. Entries are dated, newest first, and kept to one short paragraph. The public tree starts this backlog empty.
 
 <!--
+### 2026-09-18 extevidence: path-to-path relations across repositories
+`EEP-V1-010` lists a relation whose two endpoints are both paths as an `unsupported` unknown, because the V0 result model joins paths only through entities. A provider that knows "this e2e spec exercises this handler" must invent an entity today. Done means a requirement saying how a path-to-path relation enters `results` or `verification` and how its `relation_state` combines both sides. It must still never be inferred.
+
 ### YYYY-MM-DD <area>: <one-line title>
 One paragraph: what, where (file:line), why it matters, and what done looks like.
 -->
@@ -21,6 +24,3 @@ The `context.external.verification` rows in the impact receipt say which tests a
 
 ### 2026-09-18 extevidence: external obligations as a Change Frontier sidecar (EEP slice 4)
 Provider-reported capabilities and journeys downstream of a change are obligations a reviewer should see, but CEM 0.2 rejects unknown fields, so they cannot enter the CEM. Decision 0309 points at a `docs/specs/change-frontier-v0.md` sidecar keyed by the impact receipt digest. Done means the frontier report can cite the sidecar without the sidecar carrying authority or altering frontier state.
-
-### 2026-09-18 extevidence: repository identity for multi-repository providers
-`EEP-V0-006` refuses any entity endpoint whose provider id differs from the record's own and defines no cross-repository identity, so a provider that documents a system spanning several repositories can only describe this one. This needs a decision on what identifies a repository (remote URL, first commit, declared id) before a `repository` field can be widened. Done means a recorded decision and a follow-on requirement, not code.

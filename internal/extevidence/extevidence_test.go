@@ -147,11 +147,11 @@ func TestProviderSectionDeterministicAndPinned(t *testing.T) {
 	t.Parallel()
 	repo := newRepository(t)
 	source := writeRecord(t, t.TempDir(), "mock.json", fixture(t, repo.head))
-	first, err := contextindex.CanonicalJSON(Section(context.Background(), repo.index(), []string{source}, []string{"pkg/main.go"}, 10))
+	first, err := contextindex.CanonicalJSON(Section(context.Background(), repo.index(), []string{source}, nil, []string{"pkg/main.go"}, 10))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, _ := contextindex.CanonicalJSON(Section(context.Background(), repo.index(), []string{source}, []string{"pkg/main.go"}, 10))
+	second, _ := contextindex.CanonicalJSON(Section(context.Background(), repo.index(), []string{source}, nil, []string{"pkg/main.go"}, 10))
 	if !bytes.Equal(first, second) {
 		t.Fatalf("section must be deterministic:\n%s\n%s", first, second)
 	}
@@ -173,7 +173,7 @@ func TestProviderSectionDeterministicAndPinned(t *testing.T) {
 	}
 	// A relative source resolves against the index root (EEP-V0-002).
 	writeRecord(t, repo.root, "relative.json", fixture(t, repo.head))
-	relative := Section(context.Background(), repo.index(), []string{"relative.json"}, nil, 10)
+	relative := Section(context.Background(), repo.index(), []string{"relative.json"}, nil, nil, 10)
 	if state := relative["providers"].([]any)[0].(map[string]any)["state"]; state != StateLoaded {
 		t.Fatalf("relative source must load against the root, got %v", state)
 	}
@@ -185,7 +185,7 @@ func TestProviderUnavailableAndInvalidAreStructured(t *testing.T) {
 	dir := t.TempDir()
 	invalid := writeRecord(t, dir, "invalid.json", []byte(`{"schema":"external-evidence-provider/0","extra":1}`))
 	missing := filepath.Join(dir, "absent.json")
-	section := Section(context.Background(), repo.index(), []string{missing, invalid}, []string{"pkg/main.go"}, 10)
+	section := Section(context.Background(), repo.index(), []string{missing, invalid}, nil, []string{"pkg/main.go"}, 10)
 	rows := section["providers"].([]any)
 	if got := rows[0].(map[string]any)["state"]; got != StateUnavailable {
 		t.Errorf("missing file state = %v, want %s", got, StateUnavailable)
@@ -382,7 +382,7 @@ func TestLimitsAndOmissions(t *testing.T) {
 		)
 	})
 	source := writeRecord(t, t.TempDir(), "mock.json", data)
-	section := Section(context.Background(), repo.index(), []string{source}, []string{"pkg/main.go"}, 1)
+	section := Section(context.Background(), repo.index(), []string{source}, nil, []string{"pkg/main.go"}, 1)
 	results := section["results"].([]any)
 	omitted := section["omitted"].(map[string]any)
 	if len(results) != 1 || omitted["results"] != 2 {

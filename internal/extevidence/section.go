@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,16 +31,20 @@ var UntrustedTextFields = []string{
 type provider struct {
 	source, sha256, state, reason, freshness string
 	record                                   Record
+	record1                                  *Record1
+	view                                     *view
 }
 
 // Section reads every selected record and returns the `external` member of
 // the impact receipt. It never fails: every problem is a structured entry.
-func Section(ctx context.Context, index *contextindex.Index, sources, changedPaths []string, limit int) map[string]any {
+// checkouts bind V1 repositories to local directories (EEP-V1-003).
+func Section(ctx context.Context, index *contextindex.Index, sources []string, checkouts []Checkout, changedPaths []string, limit int) map[string]any {
 	providers := make([]provider, 0, len(sources))
 	for _, source := range sources {
 		providers = append(providers, load(ctx, index, source))
 	}
 	repository := repositoryTree(ctx, index, providers)
+	bound := bindV1(ctx, index, providers, checkouts)
 	changed := make(map[string]struct{}, len(changedPaths))
 	for _, path := range changedPaths {
 		changed[path] = struct{}{}
@@ -49,13 +54,58 @@ func Section(ctx context.Context, index *contextindex.Index, sources, changedPat
 		if entry.state != StateLoaded {
 			continue
 		}
-		part := compose(entry.record, changed, repository)
+		part := composeView(entry.viewOf(repository), changed)
 		merged.results = append(merged.results, part.results...)
 		merged.downstream = append(merged.downstream, part.downstream...)
 		merged.verification = append(merged.verification, part.verification...)
 		merged.unknowns = append(merged.unknowns, part.unknowns...)
 	}
-	return assemble(providers, merged, limit)
+	section := assemble(providers, merged, limit)
+	if bound != nil && len(checkouts) != 0 {
+		section["checkouts"] = bound.checkoutRows(checkoutUse(providers))
+	}
+	return section
+}
+
+// bindV1 resolves bindings only when a V1 record loaded or a checkout was
+// named, so a V0-only run makes no additional Git call.
+func bindV1(ctx context.Context, index *contextindex.Index, providers []provider, checkouts []Checkout) *bindings {
+	needed := len(checkouts) != 0
+	for _, entry := range providers {
+		needed = needed || entry.record1 != nil
+	}
+	if !needed {
+		return nil
+	}
+	bound := resolveBindings(ctx, index, checkouts)
+	for position := range providers {
+		if providers[position].record1 != nil {
+			providers[position].view = view1(ctx, index, *providers[position].record1, bound)
+		}
+	}
+	return bound
+}
+
+func (entry provider) viewOf(repository tree) *view {
+	if entry.view != nil {
+		return entry.view
+	}
+	return viewOf(entry.record, repository)
+}
+
+func checkoutUse(providers []provider) map[string]int {
+	used := make(map[string]int)
+	for _, entry := range providers {
+		if entry.view == nil {
+			continue
+		}
+		for id, state := range entry.view.repositories {
+			if state.binding == BindingCheckout {
+				used[id]++
+			}
+		}
+	}
+	return used
 }
 
 func load(ctx context.Context, index *contextindex.Index, source string) provider {
@@ -80,6 +130,16 @@ func load(ctx context.Context, index *contextindex.Index, source string) provide
 	}
 	digest := sha256.Sum256(data)
 	entry.sha256 = hex.EncodeToString(digest[:])
+	if declaredSchema(data) == Schema1 {
+		record, err := Decode1(data)
+		if err != nil {
+			entry.state, entry.reason = StateInvalid, err.Error()
+			return entry
+		}
+		entry.record1, entry.state = &record, StateLoaded
+		entry.reason = "record decoded; freshness by Git ancestry per declared repository"
+		return entry
+	}
 	record, err := Decode(data)
 	if err != nil {
 		entry.state, entry.reason = StateInvalid, err.Error()
@@ -89,6 +149,18 @@ func load(ctx context.Context, index *contextindex.Index, source string) provide
 	entry.freshness = Freshness(ctx, index.Root, index.CommitRevision, record.Repository.Revision)
 	entry.reason = "record decoded; freshness by Git ancestry against " + index.CommitRevision
 	return entry
+}
+
+// declaredSchema reads only the schema member so a V1 record takes the V1
+// decoder; anything else keeps the unchanged V0 path (EEP-V1-011).
+func declaredSchema(data []byte) string {
+	var probe struct {
+		Schema string `json:"schema"`
+	}
+	if json.Unmarshal(data, &probe) != nil {
+		return ""
+	}
+	return probe.Schema
 }
 
 // describe strips the file path from an OS error so the reason stays bounded
@@ -103,8 +175,7 @@ func describe(err error) string {
 // repositoryTree answers tracked and blob questions for every pinned path the
 // loaded records name, resolving blobs the index did not read in one Git call.
 func repositoryTree(ctx context.Context, index *contextindex.Index, providers []provider) tree {
-	blobs := make(map[string]string)
-	var pending []string
+	var pinned []string
 	for _, entry := range providers {
 		if entry.state != StateLoaded {
 			continue
@@ -115,31 +186,11 @@ func repositoryTree(ctx context.Context, index *contextindex.Index, providers []
 				if !isPath || relation.Blob == "" || checkPath(path) != "" {
 					continue
 				}
-				if _, tracked := index.Tracked[path]; !tracked {
-					continue
-				}
-				if source, read := index.Sources[path]; read {
-					blobs[path] = source.BlobHash
-					continue
-				}
-				if _, queued := blobs[path]; !queued {
-					blobs[path] = ""
-					pending = append(pending, path)
-				}
+				pinned = append(pinned, path)
 			}
 		}
 	}
-	sort.Strings(pending)
-	for path, oid := range batchBlobs(ctx, index.Root, index.CommitRevision, pending) {
-		blobs[path] = oid
-	}
-	return tree{
-		tracked: func(path string) bool { _, ok := index.Tracked[path]; return ok },
-		blob: func(path string) (string, bool) {
-			oid, known := blobs[path]
-			return oid, known && oid != ""
-		},
-	}
+	return rootTree(ctx, index, pinned)
 }
 
 func batchBlobs(ctx context.Context, root, revision string, paths []string) map[string]string {
@@ -168,6 +219,10 @@ func batchBlobs(ctx context.Context, root, revision string, paths []string) map[
 func assemble(providers []provider, merged composition, limit int) map[string]any {
 	rows := make([]any, 0, len(providers))
 	for _, entry := range providers {
+		if entry.view != nil {
+			rows = append(rows, entry.row1())
+			continue
+		}
 		rows = append(rows, map[string]any{
 			"source": entry.source, "sha256": entry.sha256, "state": entry.state, "reason": entry.reason,
 			"id": entry.record.Provider.ID, "revision": entry.record.Provider.Revision,
@@ -205,6 +260,30 @@ func assemble(providers []provider, merged composition, limit int) map[string]an
 		"unknowns":              unknowns,
 		"omitted":               map[string]any{"results": omittedResults, "downstream": omittedDownstream, "verification": omittedVerification, "unknowns": max(len(merged.unknowns)-limit, 0)},
 		"untrusted_text_fields": fields,
+	}
+}
+
+// row1 is a loaded V1 provider row: freshness is per repository, never one
+// value for the record (EEP-V1-005).
+func (entry provider) row1() map[string]any {
+	record := entry.record1
+	repositories := make([]any, 0, len(record.Repositories))
+	for _, declared := range record.Repositories {
+		state := entry.view.repositories[declared.ID]
+		row := map[string]any{"id": declared.ID, "revision": declared.Revision, "identity": state.identity, "binding": state.binding, "freshness": state.freshness}
+		optional := map[string]string{"origin": declared.Origin, "remote": declared.Remote, "tree": declared.Tree, "role": declared.Role, "captured_revision": state.captured, "checkout": state.from}
+		for key, value := range optional {
+			if value != "" {
+				row[key] = value
+			}
+		}
+		repositories = append(repositories, row)
+	}
+	return map[string]any{
+		"source": entry.source, "sha256": entry.sha256, "state": entry.state, "reason": entry.reason,
+		"schema": Schema1, "id": record.Provider.ID, "revision": record.Provider.Revision,
+		"root_repository": entry.view.primary, "repositories": repositories,
+		"entities": len(record.Entities), "relations": len(record.Relations),
 	}
 }
 
