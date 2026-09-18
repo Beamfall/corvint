@@ -404,7 +404,7 @@ func TestGo127LiveOutputConforms(t *testing.T) {
 		t.Fatalf("Go 1.27 emitted an unsupported event stream; capture it before changing the decoder: %v\n%s", err, out)
 	}
 	if len(got.Packages) != 1 || got.Packages[0].Status != "pass" || len(got.Packages[0].Tests) < 4 {
-		t.Fatalf("unexpected live state: %#v", got.Packages)
+		t.Fatalf("unexpected live state: %#v\n%s", got.Packages, out)
 	}
 	var attr, artifacts, pause, cont bool
 	for _, event := range got.Events {
