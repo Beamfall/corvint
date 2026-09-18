@@ -159,6 +159,8 @@ func helpText(topic string) string {
 		return repositoryGuidanceHelp
 	case "affected":
 		return affectedHelp
+	case "obligations":
+		return obligationsHelp
 	case "necessity":
 		return necessityHelp
 	case "surprise":
@@ -235,6 +237,7 @@ Usage:
   corvint [--root PATH] features | overview
   corvint [--root PATH] review --base FULL_COMMIT_ID [--max-refs N]
   corvint [--root PATH] affected
+  corvint obligations --cem FILE --impact FILE [--limit N]
   corvint [--root PATH] docs (draft | consume) --source PATH --package DIRECTORY [--task TEXT]
   corvint [--root PATH] batch < REQUEST
   corvint [--root PATH] work observe
@@ -251,7 +254,7 @@ Usage:
   corvint [--root PATH] witness --base REV [--head REV] [--cem MAP] [--json]
   corvint test-validity [--receipt FILE]
   corvint [--root PATH] COMMAND --help
-  corvint help [init|adopt|query|feature|eval|impact|cem|ocm|lrf|frontier|record|migrate-traces|observations|affected|features|overview|review|prove|context|index|batch|docs|depsource|necessity|surprise|answerability|kernel|lease|reads|calibrate|dogfood|work|prove-observe|adapter|dogfood-ocm|witness|test-validity]
+  corvint help [init|adopt|query|feature|eval|impact|cem|ocm|lrf|frontier|record|migrate-traces|observations|affected|obligations|features|overview|review|prove|context|index|batch|docs|depsource|necessity|surprise|answerability|kernel|lease|reads|calibrate|dogfood|work|prove-observe|adapter|dogfood-ocm|witness|test-validity]
   corvint help harness [event]
   corvint --version
 
@@ -281,6 +284,8 @@ Commands:
   review         Compose experimental range advice and local branch overlaps.
   affected       Compile the affected-test selection plan for the dirty worktree;
                  runs no test and never writes.
+  obligations    Compose the external-obligations sidecar that joins a CEM's
+                 hunks to an impact receipt's external section; never writes.
   prove          Compile the query packet and attach a falsifier verdict to
                  every evidence row; never writes.
   prove-observe  Record one prove document's verdict counts in the local
@@ -496,6 +501,28 @@ repository's falsification rate (FALSIFICATION) and one FALSIFIER line per
 falsifier: judged rows are PASS or FAIL, failed rows are FAIL. Host adapter
 degradations are tallied as ADAPTER-DEGRADATION lines by host/event/code,
 counting retained hour windows with the newest window.
+`
+
+const obligationsHelp = `Compose the external-frontier-obligations/0 sidecar for one CEM.
+
+Usage:
+  corvint obligations --cem FILE --impact FILE [--limit N]
+
+Reads one cem/0.2 document and one saved corvint impact --provider receipt,
+joins every CEM hunk to the receipt's context.external rows by path, and writes
+one external-frontier-obligations/0 document to stdout. Each hunk row lists
+associations of kind entity, obligation, test, or unknown; every non-unknown
+association carries its provider evidence reference, EEP path verification,
+and provider freshness, and none states that the record justifies the hunk.
+The sidecar binds both inputs by SHA-256 of their raw bytes: binding.cem_sha256
+equals the frontier's inputs.cemSha256 for the same CEM file, and every hunk id
+equals the CEM hunk id the frontier cites. The verb reads no repository,
+verifies no CEM, and changes no frontier state or wire. --limit bounds the
+associations per hunk (default 64); omitted rows are counted.
+
+Exit status: 0 with the sidecar on stdout; 2 with an error envelope on stderr
+for an argument error, an unreadable or oversized input, a non-cem/0.2 document,
+or a non-impact receipt.
 `
 
 const affectedHelp = `Compile the affected-test selection plan for the dirty worktree.
