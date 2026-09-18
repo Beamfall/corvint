@@ -679,7 +679,7 @@
     "reqPrefix": "EFO-V0",
     "intent": "accepted (decision 0313)",
     "delivery": "experimental (file transport only)",
-    "claim": "`corvint obligations --cem FILE --impact FILE` writes an `external-frontier-obligations/0` sidecar that joins every CEM hunk to the external entities, obligations, tests, and explicit unknowns an impact receipt reports, bound to both inputs by digest and carrying no authority.",
+    "claim": "`corvint obligations` writes a reference-only sidecar joining each CEM hunk to the external obligations, tests, and unknowns an impact receipt reports.",
     "dependsOn": [
       "docs/specs/change-frontier-v0.md",
       "docs/specs/external-evidence-provider-v0.md"

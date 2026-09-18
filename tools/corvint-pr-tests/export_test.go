@@ -217,11 +217,21 @@ func TestContainerExportInterruption(t *testing.T) {
 		if _, err := os.Stat(dest); !os.IsNotExist(err) {
 			t.Fatal("partial interrupted export retained")
 		}
-		if syscall.Kill(pid, 0) != syscall.ESRCH {
-			b, _ := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
-			if !strings.HasPrefix(strings.TrimSpace(string(b)), "Z") {
-				t.Fatal("export descendant survived")
+		// The group kill is delivered before Wait returns, but the descendant can
+		// still be exiting: poll, and count an unreaped zombie as gone.
+		gone := func() bool {
+			if syscall.Kill(pid, 0) == syscall.ESRCH {
+				return true
 			}
+			b, _ := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
+			return strings.HasPrefix(strings.TrimSpace(string(b)), "Z")
+		}
+		deadline = time.Now().Add(5 * time.Second)
+		for !gone() && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if !gone() {
+			t.Fatal("export descendant survived")
 		}
 	})
 }

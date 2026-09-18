@@ -11,7 +11,7 @@ decisions 0309 and 0313, and the feature request Beamfall/corvint#1 (section "CE
 Frontier").
 
 ## Agent digest
-- Claim: `corvint obligations --cem FILE --impact FILE` writes an `external-frontier-obligations/0` sidecar that joins every CEM hunk to the external entities, obligations, tests, and explicit unknowns an impact receipt reports, bound to both inputs by digest and carrying no authority.
+- Claim: `corvint obligations` writes a reference-only sidecar joining each CEM hunk to the external obligations, tests, and unknowns an impact receipt reports.
 - Status: accepted (decision 0313, a delegated call on Beamfall/corvint#1)/experimental (file transport only); checked by `TestObligationsHunkAssociations`, `TestObligationsBindingAndIdentity`, and `TestObligationsCommandComposesSidecar`.
 - Exists: `internal/extevidence/obligations.go`, the `corvint obligations` verb in `cmd/corvint/obligations.go`.
 - Blocked on: an ACC-V0 provider profile before any executed transport; an independent adopter record before promotion.

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -528,9 +529,20 @@ func TestProcessBoundsTimeoutAndGroupCleanup(t *testing.T) {
 	}
 	var pid int
 	_, _ = fmt.Sscan(string(raw), &pid)
-	if processAlive(pid) {
+	// The killed descendant is reparented to the host's subreaper, which may not
+	// have reaped it yet: poll, and count an unreaped zombie as gone.
+	deadline := time.Now().Add(5 * time.Second)
+	for processAlive(pid) && !zombie(pid) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if processAlive(pid) && !zombie(pid) {
 		t.Fatalf("group descendant %d survived", pid)
 	}
+}
+
+func zombie(pid int) bool {
+	out, _ := exec.Command("ps", "-o", "stat=", "-p", fmt.Sprint(pid)).Output()
+	return strings.HasPrefix(strings.TrimSpace(string(out)), "Z")
 }
 
 func TestJSONResourceCodes(t *testing.T) {

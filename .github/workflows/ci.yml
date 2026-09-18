@@ -42,7 +42,8 @@ jobs:
       - name: Provision the host tools the product's fixed PATH resolves
         # Child processes run under worksource.PlatformPath, which reaches Go through
         # /usr/local/go/bin rather than setup-go's tool cache. The dogfood shell tests use rg,
-        # and the Git fixtures commit under the global identity.
+        # and the Git fixtures commit under the global identity. Automatic maintenance is off so
+        # no detached `git maintenance` outlives a fixture commit and races its TempDir cleanup.
         run: |
           sudo rm -rf /usr/local/go
           sudo ln -s "$(go env GOROOT)" /usr/local/go
@@ -51,6 +52,9 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends ripgrep
           git config --global user.name corvint-ci
           git config --global user.email corvint-ci@users.noreply.github.com
+          git config --global maintenance.auto false
+          git config --global gc.auto 0
+          git --version
       - name: Capture trusted tool source outside tested checkout
         continue-on-error: true
         if: github.event_name == 'pull_request' && env.CORVINT_PR_TOOL_SOURCE != ''
