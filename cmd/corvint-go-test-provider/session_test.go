@@ -137,6 +137,9 @@ func TestSessionIgnoresTheUserGoEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", filepath.Join(root, "home"))
+	// os.UserConfigDir prefers XDG_CONFIG_HOME on Linux (GitHub runners set it); without
+	// this the poisoned go env file lands in the real user config and outlives the test.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "home", ".config"))
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		t.Fatal(err)
