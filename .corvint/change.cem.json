@@ -525,17 +525,8 @@
       "reason": "evidence-backed"
     },
     {
-      "basis": [
-        {
-          "evidenceId": "evidence:sha256:1f33550d660f0b0e4ef1b575397f0d0f4e367dd2f4c3b50a0c07f31e6161666e",
-          "relation": "specification"
-        },
-        {
-          "evidenceId": "evidence:sha256:6d9f88cd5ccc1ad024e4f2a76da7a09c8f09ffa5b971d986291a0014d1ec1d02",
-          "relation": "specification"
-        }
-      ],
-      "disposition": "supported",
+      "basis": [],
+      "disposition": "unknown",
       "id": "hunk:sha256:215a68615ed1945ff1377d5d6390651afb79cb63e01c4d598d402cb660458a07",
       "newRange": {
         "count": 190,
@@ -546,7 +537,7 @@
         "start": 0
       },
       "path": "docs/specs/external-evidence-provider-v1.md",
-      "reason": "evidence-backed"
+      "reason": "no-evidence"
     },
     {
       "basis": [
