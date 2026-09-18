@@ -404,7 +404,15 @@ func TestGo127LiveOutputConforms(t *testing.T) {
 		t.Fatalf("Go 1.27 emitted an unsupported event stream; capture it before changing the decoder: %v\n%s", err, out)
 	}
 	if len(got.Packages) != 1 || got.Packages[0].Status != "pass" || len(got.Packages[0].Tests) < 4 {
-		t.Fatalf("unexpected live state: %#v\n%s", got.Packages, out)
+		var env []string
+		for _, kv := range os.Environ() {
+			if strings.HasPrefix(kv, "GO") || strings.Contains(kv, "TEST") {
+				env = append(env, kv)
+			}
+		}
+		goenv, _ := exec.Command("go", "env").CombinedOutput()
+		list, _ := exec.Command("go", "list", "-f", "{{.Dir}} {{.TestGoFiles}} {{.IgnoredGoFiles}}", "./testdata/livefixture").CombinedOutput()
+		t.Fatalf("unexpected live state: %#v\nenv=%q\nargs=%q\ngo env:\n%s\ngo list: %s\n%s", got.Packages, env, os.Args, goenv, list, out)
 	}
 	var attr, artifacts, pause, cont bool
 	for _, event := range got.Events {

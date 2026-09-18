@@ -82,6 +82,10 @@ jobs:
           go build -trimpath -buildvcs=false -o "$RUNNER_TEMP/corvint-pr-bin/corvint" ./cmd/corvint
           go build -trimpath -buildvcs=false -o "$RUNNER_TEMP/corvint-pr-bin/selector" ./tools/gate-affected-select
           go build -trimpath -buildvcs=false -o "$RUNNER_TEMP/corvint-pr-bin/driver" ./tools/corvint-pr-tests
+      - name: TEMP liveverify diagnostic
+        continue-on-error: true
+        working-directory: source
+        run: go test -json -count=1 -race -run 'TestGo127LiveOutputConforms' ./internal/liveverify/gotest/ | grep -v '"Action":"run"'
       - name: Go tests (full until matching shadow qualification)
         working-directory: source
         env:
