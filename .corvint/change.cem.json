@@ -425,13 +425,8 @@
       "reason": "evidence-backed"
     },
     {
-      "basis": [
-        {
-          "evidenceId": "evidence:sha256:36c6e24e7e7340d0d3a517d82658053d893f35fef0c22d2e31e82006d6d182a2",
-          "relation": "specification"
-        }
-      ],
-      "disposition": "supported",
+      "basis": [],
+      "disposition": "unknown",
       "id": "hunk:sha256:461cebe6bfccd55886abaafb28d2572fd59bf0dc6f7eaa419fd1480b525618be",
       "newRange": {
         "count": 170,
@@ -442,7 +437,7 @@
         "start": 0
       },
       "path": "docs/specs/external-test-selection-v0.md",
-      "reason": "evidence-backed"
+      "reason": "no-evidence"
     },
     {
       "basis": [
