@@ -213,7 +213,7 @@ func loaded(t *testing.T, repo repository, data []byte, changed ...string) compo
 	for _, path := range changed {
 		set[path] = struct{}{}
 	}
-	return compose(record, set, repositoryTree(context.Background(), repo.index(), []provider{{state: StateLoaded, record: record}}))
+	return compose(record, set, repositoryTree(context.Background(), indexRoot(repo.index()), []provider{{state: StateLoaded, record: record}}))
 }
 
 func TestEndpointIdentitiesResolve(t *testing.T) {

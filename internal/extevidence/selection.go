@@ -1,0 +1,606 @@
+package extevidence
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// SelectionSchema versions the affected-plan test_selection member (ETS-V0-002).
+const SelectionSchema = "external-test-selection/0"
+
+// Selection profiles name which verification relation types may narrow a
+// selection (ETS-V0-004). No profile admits a context type.
+const (
+	ProfileStrict   = "strict"
+	ProfileCoverage = "coverage"
+)
+
+// Selection states (ETS-V0-003). The state is decided from obligations,
+// never from how many tests were selected.
+const (
+	SelectionNarrow  = "narrow-selection-allowed"
+	SelectionFull    = "full-relevant-suite-required"
+	SelectionBlocked = "blocked"
+	SelectionUnknown = "unknown"
+)
+
+// confidenceUnscored is reported because no record schema carries a
+// confidence; Core never invents one (ETS-V0-007).
+const confidenceUnscored = "unscored"
+
+var selectionProfiles = map[string]map[string]struct{}{
+	ProfileStrict:   {"verifies": {}, "asserts": {}},
+	ProfileCoverage: {"verifies": {}, "asserts": {}, "covers": {}},
+}
+
+// contextTypes may widen review context but never qualify (ETS-V0-005).
+var contextTypes = map[string]string{"navigates": "navigation-only-evidence", "candidate": "candidate-only-evidence"}
+
+// nonBlocking codes mark weak or context-only evidence: it cannot qualify an
+// obligation, and it cannot veto one another relation qualified (ETS-V0-006).
+var nonBlocking = map[string]struct{}{
+	"navigation-only-evidence": {}, "candidate-only-evidence": {}, "profile-excluded-relation": {},
+	"inferred-only-evidence": {}, "excluded-evidence-kind": {},
+}
+
+var identityCodes = map[string]string{IdentityUnresolved: "unresolved-repository-identity", IdentityAmbiguous: "ambiguous-repository-identity"}
+
+var bindingCodes = map[string]string{
+	BindingUnresolved: "unresolved-repository-identity", BindingAmbiguous: "ambiguous-repository-identity",
+	BindingMismatch: "repository-binding-mismatch", BindingUnbound: "unbound-test-repository", BindingUnavailable: "repository-unavailable",
+}
+
+var freshnessCodes = map[string]string{
+	FreshnessEqual: "", FreshnessRevisionUnavailable: "revision-unavailable", FreshnessNotEvaluated: "revision-unavailable",
+}
+
+var verificationCodes = map[string]string{
+	VerificationVerified: "", VerificationMissing: "missing-path-reference", VerificationStale: "stale-path-reference",
+	VerificationNotVerified: "unbound-test-repository",
+}
+
+var unknownCodes = map[string]string{
+	unknownUnresolved: "unresolved-endpoint", unknownUnsupported: "unsupported-relation", unknownExcluded: "excluded-evidence-kind",
+}
+
+// ValidSelectionProfile reports whether name is an accepted profile.
+func ValidSelectionProfile(name string) bool {
+	_, known := selectionProfiles[name]
+	return known
+}
+
+// SelectionInput is what the affected plan contributes. Changed is every
+// changed root path (plan.dirty); Worktree is its uncommitted subset, which no
+// revision-bound record can describe; Incomplete names why the plan scope is
+// not bounded; Mandatory is echoed unchanged (ETS-V0-009).
+type SelectionInput struct {
+	Changed    []string
+	Worktree   []string
+	Incomplete []string
+	Mandatory  []any
+	Profile    string
+	Limit      int
+}
+
+// obligation is one changed path or affected entity that narrowing must
+// justify. It is covered only when qualified and never blocked.
+type obligation struct {
+	provider, subject string
+	qualified         bool
+	blocked           bool
+	reasons           map[string]struct{}
+}
+
+type selectionRow struct {
+	key string
+	row map[string]any
+}
+
+type selector struct {
+	input              SelectionInput
+	admitted           map[string]struct{}
+	changed, worktree  map[string]struct{}
+	paths, entities    map[string]*obligation
+	selected, excluded []selectionRow
+	blocking           map[string]map[string]any
+	unknowns           []selectionRow
+	failed             int
+}
+
+// Selection compiles the test_selection advice for an affected plan at the
+// root commit revision. It reads provider records and Git objects only,
+// executes nothing, and never fails: every problem is a structured entry.
+func Selection(ctx context.Context, dir, revision string, sources []string, checkouts []Checkout, input SelectionInput) map[string]any {
+	providers, repository, _ := loadAll(ctx, headRoot(dir, revision), sources, checkouts)
+	s := newSelector(input)
+	for _, entry := range providers {
+		if entry.state != StateLoaded {
+			s.failed++
+			s.block("provider-"+entry.state, entry.source, "", entry.reason)
+			continue
+		}
+		s.add(entry, entry.viewOf(repository))
+	}
+	return s.result(providers)
+}
+
+func newSelector(input SelectionInput) *selector {
+	s := &selector{
+		input: input, admitted: selectionProfiles[input.Profile],
+		changed: stringSet(input.Changed), worktree: stringSet(input.Worktree),
+		paths: map[string]*obligation{}, entities: map[string]*obligation{}, blocking: map[string]map[string]any{},
+	}
+	for _, path := range input.Changed {
+		s.paths[path] = &obligation{subject: path, reasons: map[string]struct{}{}}
+	}
+	return s
+}
+
+func stringSet(values []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		set[value] = struct{}{}
+	}
+	return set
+}
+
+// add evaluates one loaded record: joins map changed paths to entities,
+// entity relations widen the obligations one hop, and every verification or
+// context relation on an obligation is selected or excluded with a reason.
+func (s *selector) add(entry provider, v *view) {
+	s.unrooted(v)
+	obligations := s.join(entry, v)
+	s.widen(v, obligations)
+	for id := range obligations {
+		s.entity(v.provider, id)
+	}
+	for _, candidate := range v.links {
+		s.test(entry, v, candidate, obligations)
+	}
+	for _, failure := range v.unknowns {
+		s.unknown(v, failure, obligations)
+	}
+}
+
+// unrooted blocks every changed path when a V1 record cannot say which of its
+// repositories is the root: nothing it relates can then be joined, and
+// silence would read as absence of evidence (ETS-V0-006).
+func (s *selector) unrooted(v *view) {
+	if v.repositories == nil || v.primary != "" {
+		return
+	}
+	code := "unbound-root-repository"
+	for _, state := range v.repositories {
+		if state.identity == IdentityAmbiguous || state.binding == BindingAmbiguous {
+			code = "ambiguous-repository-identity"
+		}
+	}
+	for _, path := range s.input.Changed {
+		s.record(s.paths[path], code, v.provider, path)
+	}
+}
+
+// join maps every changed root path a relation names to its entity. Any join
+// creates an obligation, whatever its evidence: weak evidence may widen.
+func (s *selector) join(entry provider, v *view) map[string]struct{} {
+	obligations := map[string]struct{}{}
+	for _, candidate := range v.links {
+		path, entity, ok := pathAndEntity(candidate)
+		if !ok || !v.isChanged(path, s.changed) {
+			continue
+		}
+		obligations[entity] = struct{}{}
+		code := s.qualify(entry, v, candidate, path)
+		s.record(s.paths[path.path], code, v.provider, path.path)
+	}
+	return obligations
+}
+
+// widen adds the one-hop downstream entities impact reports; a context or
+// verification relation between entities is not a dependency.
+func (s *selector) widen(v *view, obligations map[string]struct{}) {
+	var reached []string
+	for _, candidate := range v.links {
+		if candidate.from.isPath() || candidate.to.isPath() || s.isTestOrContext(candidate) {
+			continue
+		}
+		_, fromListed := obligations[candidate.from.entity]
+		_, toListed := obligations[candidate.to.entity]
+		if fromListed {
+			reached = append(reached, candidate.to.entity)
+		}
+		if toListed {
+			reached = append(reached, candidate.from.entity)
+		}
+	}
+	for _, id := range reached {
+		obligations[id] = struct{}{}
+	}
+}
+
+func (s *selector) isTestOrContext(candidate link) bool {
+	_, verifying := verificationTypes[candidate.relation.Type]
+	_, context := contextTypes[candidate.relation.Type]
+	return verifying || context
+}
+
+func (s *selector) entity(provider, id string) *obligation {
+	key := provider + ":" + id
+	if s.entities[key] == nil {
+		s.entities[key] = &obligation{provider: provider, subject: key, reasons: map[string]struct{}{}}
+	}
+	return s.entities[key]
+}
+
+// test evaluates one verification or context relation on an obligation. An
+// entity-only relation names no runnable test, so it can never qualify.
+func (s *selector) test(entry provider, v *view, candidate link, obligations map[string]struct{}) {
+	if !s.isTestOrContext(candidate) {
+		return
+	}
+	side, entity, ok := pathAndEntity(candidate)
+	if !ok {
+		s.entityTest(entry, v, candidate, obligations)
+		return
+	}
+	if _, affected := obligations[entity]; !affected {
+		return
+	}
+	code := s.qualify(entry, v, candidate, side)
+	s.record(s.entity(v.provider, entity), code, v.provider, v.provider+":"+entity)
+	row := s.row(entry, v, candidate, side, entity, code)
+	if code == "" {
+		s.selected = append(s.selected, row)
+		return
+	}
+	s.excluded = append(s.excluded, row)
+}
+
+func (s *selector) entityTest(entry provider, v *view, candidate link, obligations map[string]struct{}) {
+	if candidate.from.isPath() || candidate.to.isPath() {
+		return
+	}
+	code := s.weakCode(candidate.relation.Type, candidate.relation.Evidence)
+	if code == "" {
+		code = "entity-test-endpoint"
+	}
+	for _, id := range []string{candidate.from.entity, candidate.to.entity} {
+		if _, affected := obligations[id]; affected {
+			s.record(s.entity(v.provider, id), code, v.provider, v.provider+":"+id)
+		}
+	}
+}
+
+// qualify returns "" when the relation meets every ETS-V0-005 condition for
+// its path side, else the first failing condition's code in a fixed order.
+func (s *selector) qualify(entry provider, v *view, candidate link, side endpoint) string {
+	checks := []func() string{
+		func() string { return s.weakCode(candidate.relation.Type, candidate.relation.Evidence) },
+		func() string { return unsupportedCode(candidate.relation.Type) },
+		func() string { return identityCode(v, side) },
+		func() string { return freshnessCode(entry, v, side) },
+		func() string { return verificationCodes[v.verify(side)] },
+		func() string { return s.worktreeCode(v, side) },
+	}
+	for _, check := range checks {
+		if code := check(); code != "" {
+			return code
+		}
+	}
+	return ""
+}
+
+// weakCode applies conditions 1 and 2. Weak evidence is decided before any
+// resolution, so it never blocks whether or not its endpoints resolved.
+func (s *selector) weakCode(relationType, evidence string) string {
+	if code := contextTypes[relationType]; code != "" {
+		return code
+	}
+	_, verifying := verificationTypes[relationType]
+	_, admitted := s.admitted[relationType]
+	if verifying && !admitted {
+		return "profile-excluded-relation"
+	}
+	if evidence == EvidenceInferred {
+		return "inferred-only-evidence"
+	}
+	return ""
+}
+
+// unsupportedCode refuses a namespaced relation type: its meaning belongs to
+// the provider, so Core can neither map nor qualify with it (ETS-V0-005).
+func unsupportedCode(relationType string) string {
+	if strings.Contains(relationType, ":") {
+		return "unsupported-relation"
+	}
+	return ""
+}
+
+// identityCode applies conditions 3 and 4: a V0 record declares no
+// repository identity, so its paths can never be bound to one.
+func identityCode(v *view, side endpoint) string {
+	if v.repositories == nil {
+		return "no-repository-identity"
+	}
+	state := v.repositories[side.repository]
+	if code := identityCodes[state.identity]; code != "" {
+		return code
+	}
+	return bindingCodes[state.binding]
+}
+
+func freshnessCode(entry provider, v *view, side endpoint) string {
+	freshness := entry.freshness
+	if v.repositories != nil {
+		freshness = v.repositories[side.repository].freshness
+	}
+	code, known := freshnessCodes[freshness]
+	if !known {
+		return "stale-provider-revision"
+	}
+	return code
+}
+
+// worktreeCode refuses a root path with uncommitted changes: the record
+// describes a commit, never the working tree.
+func (s *selector) worktreeCode(v *view, side endpoint) string {
+	if side.repository != v.primary {
+		return ""
+	}
+	if _, dirty := s.worktree[side.path]; dirty {
+		return "worktree-dirty-path"
+	}
+	return ""
+}
+
+// record folds one evaluated relation into an obligation.
+func (s *selector) record(target *obligation, code, provider, subject string) {
+	if code == "" {
+		target.qualified = true
+		return
+	}
+	target.reasons[code] = struct{}{}
+	if _, weak := nonBlocking[code]; weak {
+		return
+	}
+	target.blocked = true
+	s.block(code, provider, subject, "")
+}
+
+func (s *selector) block(code, provider, subject, detail string) {
+	key := code + "\x00" + provider + "\x00" + subject + "\x00" + detail
+	row := map[string]any{"code": code, "provider": provider}
+	optional := map[string]string{"subject": subject, "detail": detail}
+	for name, value := range optional {
+		if value != "" {
+			row[name] = value
+		}
+	}
+	s.blocking[key] = row
+}
+
+// unknown folds a relation composition could not resolve. It touches the
+// selection when either raw endpoint names a changed root path or an
+// obligation; an unresolved or unsupported one then blocks what it touches.
+func (s *selector) unknown(v *view, failure unknown, obligations map[string]struct{}) {
+	paths, entities := touched(v, failure, s.changed, obligations)
+	if len(paths)+len(entities) == 0 {
+		return
+	}
+	code := unknownCodes[failure.state]
+	if weak := s.weakCode(failure.relation.Type, failure.relation.Evidence); weak != "" && failure.state != unknownExcluded {
+		code = weak
+	}
+	for _, path := range paths {
+		s.record(s.paths[path], code, v.provider, path)
+	}
+	for _, id := range entities {
+		s.record(s.entity(v.provider, id), code, v.provider, v.provider+":"+id)
+	}
+	row := failure.toMap()
+	row["code"] = code
+	s.unknowns = append(s.unknowns, selectionRow{key: v.provider + "\x00" + failure.relation.From + "\x00" + failure.relation.To + "\x00" + failure.relation.Type, row: row})
+}
+
+func touched(v *view, failure unknown, changed, obligations map[string]struct{}) (paths, entities []string) {
+	for _, raw := range rawEndpoints(failure) {
+		if _, isChanged := changed[raw.Path]; raw.Path != "" && isChanged && raw.Repository == v.primary {
+			paths = append(paths, raw.Path)
+		}
+		if _, affected := obligations[raw.Entity]; raw.Entity != "" && affected && raw.Provider == v.provider {
+			entities = append(entities, raw.Entity)
+		}
+	}
+	return paths, entities
+}
+
+// rawEndpoints reads an unknown's endpoints in the V1 form; a V0 endpoint is
+// `path:P` or `provider:entity` in the one root repository.
+func rawEndpoints(failure unknown) []Endpoint1 {
+	if failure.structured != nil {
+		return []Endpoint1{failure.structured.From, failure.structured.To}
+	}
+	out := make([]Endpoint1, 0, 2)
+	for _, raw := range []string{failure.relation.From, failure.relation.To} {
+		if path, isPath := strings.CutPrefix(raw, "path:"); isPath {
+			out = append(out, Endpoint1{Path: path})
+			continue
+		}
+		provider, id, _ := strings.Cut(raw, ":")
+		out = append(out, Endpoint1{Provider: provider, Entity: id})
+	}
+	return out
+}
+
+// row is one selected or excluded test with its full provenance (ETS-V0-007).
+func (s *selector) row(entry provider, v *view, candidate link, side endpoint, entity, code string) selectionRow {
+	out := map[string]any{
+		"authority": Authority, "confidence": confidenceUnscored,
+		"provider": v.provider, "provider_revision": entry.providerRevision(),
+		"entity": v.provider + ":" + entity, "entity_kind": v.entities[entity].Kind,
+		"test":          map[string]any{"path": side.path},
+		"relation":      relationMap(candidate.relation, candidate.structured),
+		"relation_type": candidate.relation.Type, "evidence": candidate.relation.Evidence,
+		"verification": v.verify(side), "limitations": limitations(v, side),
+	}
+	s.provenance(out, entry, v, side)
+	if code == "" {
+		out["reason"] = fmt.Sprintf("%s %s relation from %s to affected entity %s:%s meets every qualifying condition", candidate.relation.Evidence, candidate.relation.Type, v.label(side), v.provider, entity)
+	} else {
+		_, weak := nonBlocking[code]
+		out["code"], out["blocking"] = code, !weak
+		out["reason"] = fmt.Sprintf("%s %s relation from %s to affected entity %s:%s does not qualify: %s", candidate.relation.Evidence, candidate.relation.Type, v.label(side), v.provider, entity, code)
+	}
+	key := strings.Join([]string{v.provider + ":" + entity, side.repository, side.path, candidate.relation.Type, candidate.relation.Evidence, candidate.relation.From, candidate.relation.To, code, entry.source}, "\x00")
+	return selectionRow{key: key, row: out}
+}
+
+// provenance adds the repository, revision, freshness, and binding evidence of
+// the test side; a V0 record has one provider-wide freshness and no identity.
+func (s *selector) provenance(out map[string]any, entry provider, v *view, side endpoint) {
+	if v.repositories == nil {
+		out["schema"], out["freshness"] = Schema, entry.freshness
+		out["source_revision"], out["test_revision"] = entry.record.Repository.Revision, entry.record.Repository.Revision
+		return
+	}
+	state := v.repositories[side.repository]
+	out["schema"] = Schema1
+	out["test"].(map[string]any)["repository"] = side.repository
+	out["identity"], out["binding"], out["freshness"] = state.identity, state.binding, state.freshness
+	out["test_revision"] = state.declared.Revision
+	if primary := v.repositories[v.primary]; primary != nil {
+		out["source_revision"] = primary.declared.Revision
+	}
+	if state.captured != "" {
+		out["captured_revision"] = state.captured
+	}
+	if side.blob != "" {
+		out["test"].(map[string]any)["blob"] = side.blob
+	}
+	out["relation_state"] = worse(RelationFresh, sideState(state, v.verify(side)))
+	out["crosses_repositories"] = side.repository != v.primary
+}
+
+func limitations(v *view, side endpoint) []any {
+	out := []any{"not-coverage-proof", "not-executed"}
+	if v.repositories != nil && v.repositories[side.repository].binding == BindingCheckout {
+		out = append(out, "checkout-worktree-not-inspected")
+	}
+	return out
+}
+
+func (entry provider) providerRevision() string {
+	if entry.record1 != nil {
+		return entry.record1.Provider.Revision
+	}
+	return entry.record.Provider.Revision
+}
+
+// state applies the ETS-V0-003 precedence: a failed provider blocks, an
+// incomplete or empty plan is unknown, any open obligation or blocking reason
+// requires the full relevant suite, and only then may selection narrow.
+func (s *selector) state() (string, string) {
+	uncoveredPaths, uncoveredEntities := s.uncovered(s.paths), s.uncovered(s.entities)
+	switch {
+	case s.failed > 0:
+		return SelectionBlocked, "provider-unavailable"
+	case len(s.input.Incomplete) > 0:
+		return SelectionUnknown, "incomplete-affected-scope"
+	case len(s.input.Changed) == 0:
+		return SelectionUnknown, "no-changed-paths"
+	case len(uncoveredPaths)+len(uncoveredEntities)+len(s.blocking) > 0:
+		return SelectionFull, "open-obligations"
+	}
+	return SelectionNarrow, "every-obligation-qualified"
+}
+
+func (s *selector) uncovered(obligations map[string]*obligation) []selectionRow {
+	var out []selectionRow
+	for key, target := range obligations {
+		if target.qualified && !target.blocked {
+			continue
+		}
+		if len(target.reasons) == 0 {
+			target.reasons["no-external-evidence"] = struct{}{}
+		}
+		reasons := make([]string, 0, len(target.reasons))
+		for code := range target.reasons {
+			reasons = append(reasons, code)
+		}
+		sort.Strings(reasons)
+		row := map[string]any{"reasons": toAny(reasons), "blocked": target.blocked}
+		if target.provider == "" {
+			row["path"] = target.subject
+		} else {
+			row["provider"], row["entity"] = target.provider, target.subject
+		}
+		out = append(out, selectionRow{key: key, row: row})
+	}
+	return out
+}
+
+func (s *selector) result(providers []provider) map[string]any {
+	state, reason := s.state()
+	limit := max(s.input.Limit, 0)
+	lists := map[string][]selectionRow{
+		"selected": s.selected, "candidates": s.excluded, "uncovered_paths": s.uncovered(s.paths),
+		"uncovered_entities": s.uncovered(s.entities), "blocking_reasons": blockingRows(s.blocking), "unknowns": s.unknowns,
+	}
+	out := map[string]any{
+		"schema": SelectionSchema, "profile": s.input.Profile, "admitted_types": toAny(sortedKeys(s.admitted)),
+		"state": state, "state_reason": reason, "authority": Authority,
+		"mandatory": s.mandatory(), "provider_evidence": providerRows(providers),
+		"scope": toAny(append([]string{}, s.input.Incomplete...)),
+		"note":  "advice only; no test was executed; mandatory checks stay required; an empty or narrow selection is never proof that other tests are unneeded",
+		"untrusted_text_fields": toAny([]string{
+			"test_selection.selected[].relation.rule", "test_selection.selected[].relation.reference",
+			"test_selection.candidates[].relation.rule", "test_selection.candidates[].relation.reference",
+		}),
+	}
+	omitted := map[string]any{}
+	for name, rows := range lists {
+		sort.SliceStable(rows, func(i, j int) bool { return rows[i].key < rows[j].key })
+		kept := min(len(rows), limit)
+		values := make([]any, 0, kept)
+		for _, entry := range rows[:kept] {
+			values = append(values, entry.row)
+		}
+		out[name], omitted[name] = values, len(rows)-kept
+	}
+	out["omitted"] = omitted
+	return out
+}
+
+func (s *selector) mandatory() []any {
+	if s.input.Mandatory == nil {
+		return []any{}
+	}
+	return s.input.Mandatory
+}
+
+func blockingRows(rows map[string]map[string]any) []selectionRow {
+	out := make([]selectionRow, 0, len(rows))
+	for key, row := range rows {
+		out = append(out, selectionRow{key: key, row: row})
+	}
+	return out
+}
+
+func sortedKeys(set map[string]struct{}) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func toAny(values []string) []any {
+	out := make([]any, 0, len(values))
+	for _, value := range values {
+		out = append(out, value)
+	}
+	return out
+}

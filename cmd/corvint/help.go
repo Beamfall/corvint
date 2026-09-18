@@ -503,6 +503,9 @@ const affectedHelp = `Compile the affected-test selection plan for the dirty wor
 Usage:
   corvint [--root PATH] affected
   corvint [--root PATH] affected --base FULL_COMMIT_ID
+  corvint [--root PATH] affected [--base FULL_COMMIT_ID] --provider RECORD
+          [--provider RECORD ...] [--repository ID=DIR ...]
+          [--selection-profile strict|coverage]
 
 The command reads the Git worktree status, builds the multi-language unit graph
 from source text, and writes one affected-plan/0 document to stdout: the
@@ -523,6 +526,16 @@ advisory go test command over the selected packages and the unknown frontier
 that qualifies it. The advice is static: no check is executed, nothing is
 derived from an exclusion, and every mandatory check remains required whatever
 the advisory list says.
+
+--provider (up to 4 external-evidence records, decoded and verified exactly as
+impact does) adds advice.test_selection, an external-test-selection/0 member:
+state is narrow-selection-allowed only when every changed path and every
+entity it reaches is qualified by a fresh, bound, verified verifies or asserts
+relation (covers too under --selection-profile coverage); otherwise it is
+full-relevant-suite-required, blocked, or unknown, with every reason listed.
+Uncommitted paths never qualify. The member never removes a check, never runs a
+test, and is absent when no --provider is given. --repository binds a declared
+repository id to a local checkout, as for impact.
 `
 
 const proveHelp = `Compile the falsifiable context packet for a task, a change, or a CEM map.

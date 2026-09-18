@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Beamfall/corvint/internal/extevidence"
 	"github.com/Beamfall/corvint/internal/gokernel"
 	"github.com/Beamfall/corvint/internal/liveverify/affected"
 	"github.com/Beamfall/corvint/internal/liveverify/affected/dotnet"
@@ -51,10 +52,14 @@ type affectedRange struct {
 	Paths []string `json:"paths"`
 }
 
-// affectedInvocation is one parsed `affected` command line.
+// affectedInvocation is one parsed `affected` command line. Providers,
+// Checkouts, and SelectionProfile are set only by the ETS-V0 flags.
 type affectedInvocation struct {
-	Root string
-	Base string
+	Root             string
+	Base             string
+	Providers        []string
+	Checkouts        []extevidence.Checkout
+	SelectionProfile string
 }
 
 type affectedProvider struct {
@@ -73,12 +78,14 @@ type affectedGoProvider struct {
 // mandatory-first in source order, then the single advisory command; Unknown is
 // the sorted frontier an operator must read before trusting the advisory half.
 // Nothing here is derived from plan.excluded: an exclusion is never advice
-// (AFP-V0-004).
+// (AFP-V0-004). TestSelection is present only when a provider record was
+// named (ETS-V0-002); it never adds to or removes from Checks.
 type affectedAdvice struct {
-	Checks  []affectedCheck `json:"checks"`
-	Note    string          `json:"note"`
-	Status  string          `json:"status"`
-	Unknown []string        `json:"unknown"`
+	Checks        []affectedCheck `json:"checks"`
+	Note          string          `json:"note"`
+	Status        string          `json:"status"`
+	TestSelection map[string]any  `json:"test_selection,omitempty"`
+	Unknown       []string        `json:"unknown"`
 }
 
 type affectedCheck struct {
@@ -134,7 +141,7 @@ func parseAffectedInvocation(arguments []string) (affectedInvocation, bool, erro
 	if index >= len(arguments) || arguments[index] != "affected" {
 		return affectedInvocation{}, false, nil
 	}
-	base, err := parseAffectedBase(arguments[index+1:])
+	invocation, err := parseAffectedOptions(arguments[index+1:])
 	if err != nil {
 		return affectedInvocation{}, true, err
 	}
@@ -145,32 +152,107 @@ func parseAffectedInvocation(arguments []string) (affectedInvocation, bool, erro
 	if err != nil {
 		return affectedInvocation{}, true, err
 	}
-	return affectedInvocation{Root: resolved, Base: base}, true, nil
+	invocation.Root = resolved
+	return invocation, true, nil
 }
 
-// parseAffectedBase accepts at most one `--base FULL_COMMIT_ID` (or
-// `--base=FULL_COMMIT_ID`) after `affected`. The value must already be a
-// full object id: a ref name is resolved by the caller, never here, so the
-// receipt's range.base is exactly what the operator asked for.
-func parseAffectedBase(rest []string) (string, error) {
-	if len(rest) == 0 {
-		return "", nil
+// affectedOptionNames are the flags `affected` accepts, each taking one value
+// as `--flag VALUE` or `--flag=VALUE`.
+var affectedOptionNames = map[string]bool{"--base": true, "--provider": true, "--repository": true, "--selection-profile": true}
+
+// parseAffectedOptions reads the flags after `affected`. `--base` must
+// already be a full object id: a ref name is resolved by the caller, never
+// here, so range.base is exactly what the operator asked for. `--provider`,
+// `--repository`, and `--selection-profile` follow the impact bounds and
+// errors (ETS-V0-001).
+func parseAffectedOptions(rest []string) (affectedInvocation, error) {
+	invocation := affectedInvocation{}
+	baseSet := false
+	for index := 0; index < len(rest); {
+		name, value, inline := strings.Cut(rest[index], "=")
+		if !affectedOptionNames[name] {
+			return affectedInvocation{}, argumentError("unrecognized arguments: " + rest[index])
+		}
+		if !inline {
+			if index+1 >= len(rest) {
+				return affectedInvocation{}, argumentError(name + " requires exactly one value")
+			}
+			value = rest[index+1]
+			index++
+		}
+		index++
+		var err error
+		switch name {
+		case "--base":
+			err = setAffectedBase(&invocation, &baseSet, value)
+		case "--provider":
+			err = addAffectedProvider(&invocation, value)
+		case "--repository":
+			err = addAffectedCheckout(&invocation, value)
+		default:
+			err = setAffectedSelectionProfile(&invocation, value)
+		}
+		if err != nil {
+			return affectedInvocation{}, err
+		}
 	}
-	value := ""
-	switch {
-	case rest[0] == "--base" && len(rest) == 2:
-		value = rest[1]
-	case strings.HasPrefix(rest[0], "--base=") && len(rest) == 1:
-		value = strings.TrimPrefix(rest[0], "--base=")
-	case rest[0] == "--base":
-		return "", argumentError("--base requires exactly one full commit id")
-	default:
-		return "", argumentError("unrecognized arguments: " + rest[0])
+	if len(invocation.Providers) == 0 && (len(invocation.Checkouts) != 0 || invocation.SelectionProfile != "") {
+		return affectedInvocation{}, argumentError("--repository and --selection-profile require --provider")
+	}
+	if len(invocation.Providers) != 0 && invocation.SelectionProfile == "" {
+		invocation.SelectionProfile = extevidence.ProfileStrict
+	}
+	return invocation, nil
+}
+
+func setAffectedBase(invocation *affectedInvocation, baseSet *bool, value string) error {
+	if *baseSet {
+		return argumentError("--base requires exactly one full commit id")
 	}
 	if !validGitObjectID(value) {
-		return "", argumentError("--base must be a full commit id, got " + value)
+		return argumentError("--base must be a full commit id, got " + value)
 	}
-	return value, nil
+	*baseSet, invocation.Base = true, value
+	return nil
+}
+
+func addAffectedProvider(invocation *affectedInvocation, value string) error {
+	if value == "" {
+		return argumentError("argument --provider: expected one argument")
+	}
+	if len(invocation.Providers) == extevidence.MaxProviders {
+		return argumentError(fmt.Sprintf("argument --provider: at most %d providers", extevidence.MaxProviders))
+	}
+	invocation.Providers = append(invocation.Providers, value)
+	return nil
+}
+
+func addAffectedCheckout(invocation *affectedInvocation, value string) error {
+	checkout, err := extevidence.ParseCheckout(value)
+	if err != nil {
+		return argumentError("argument --repository: " + err.Error())
+	}
+	if len(invocation.Checkouts) == extevidence.MaxCheckouts {
+		return argumentError(fmt.Sprintf("argument --repository: at most %d checkouts", extevidence.MaxCheckouts))
+	}
+	for _, earlier := range invocation.Checkouts {
+		if earlier.ID == checkout.ID {
+			return argumentError("argument --repository: repository id " + pythonRepr(checkout.ID) + " is bound twice")
+		}
+	}
+	invocation.Checkouts = append(invocation.Checkouts, checkout)
+	return nil
+}
+
+func setAffectedSelectionProfile(invocation *affectedInvocation, value string) error {
+	if invocation.SelectionProfile != "" {
+		return argumentError("--selection-profile requires exactly one value")
+	}
+	if !extevidence.ValidSelectionProfile(value) {
+		return argumentError("--selection-profile must be strict or coverage, got " + value)
+	}
+	invocation.SelectionProfile = value
+	return nil
 }
 
 func runAffected(ctx context.Context, invocation affectedInvocation, stdout, stderr io.Writer) int {
@@ -233,8 +315,12 @@ func compileAffected(ctx context.Context, invocation affectedInvocation) (affect
 	}
 	plan := affected.Select(graph, affected.NormalizePaths(append(append([]string{}, dirty...), committed...)))
 	provider := providerGoProjection(graph, plan)
+	advice := compileAffectedAdvice(root, plan, provider)
+	if len(invocation.Providers) != 0 {
+		advice.TestSelection = extevidence.Selection(ctx, root, revision, invocation.Providers, invocation.Checkouts, affectedSelectionInput(invocation, plan, dirty, advice))
+	}
 	return affectedReceipt{
-		Advice:   compileAffectedAdvice(root, plan, provider),
+		Advice:   advice,
 		Mutates:  false,
 		OK:       true,
 		Plan:     plan,
@@ -244,6 +330,33 @@ func compileAffected(ctx context.Context, invocation affectedInvocation) (affect
 		Revision: revision,
 		Tool:     "affected",
 	}, nil
+}
+
+// affectedSelectionMaxItems bounds every test_selection list; the rest is
+// counted in test_selection.omitted (ETS-V0-010).
+const affectedSelectionMaxItems = 64
+
+// affectedSelectionInput hands the plan to the selector: every changed path,
+// the uncommitted subset no record can describe, why the scope is not
+// bounded, and the mandatory checks it must echo unchanged (ETS-V0-009).
+func affectedSelectionInput(invocation affectedInvocation, plan affected.Plan, dirty []string, advice affectedAdvice) extevidence.SelectionInput {
+	incomplete := []string{}
+	for _, entry := range plan.Unknown {
+		incomplete = append(incomplete, entry.Reason+": "+entry.Detail)
+	}
+	if plan.Scope != affected.ScopeBounded && len(incomplete) == 0 {
+		incomplete = append(incomplete, "plan scope is "+plan.Scope)
+	}
+	mandatory := []any{}
+	for _, check := range advice.Checks {
+		if check.Kind == adviceKindMandatory {
+			mandatory = append(mandatory, map[string]any{"command": check.Command, "kind": check.Kind, "reason": check.Reason, "source": check.Source})
+		}
+	}
+	return extevidence.SelectionInput{
+		Changed: plan.Dirty, Worktree: affected.NormalizePaths(dirty), Incomplete: sortedUniqueStrings(incomplete),
+		Mandatory: mandatory, Profile: invocation.SelectionProfile, Limit: affectedSelectionMaxItems,
+	}
 }
 
 // affectedRangePaths resolves the requested base to a commit in this

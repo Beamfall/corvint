@@ -87,7 +87,8 @@ deterministic plan for one dirty worktree in bounded time with an explicit unkno
   `go:included-directory-walk-bounded` to the language frontier, widening the plan to `UNKNOWN`
   without failing graph construction. The toolchain is never executed.
 - **AFP-V0-009:** (accepted 2026-09-04 by decision 0052) The receipt MUST carry an `advice` member with exactly the
-  members `status="PLAN_ONLY"`, `checks`, `unknown`, and `note`. Each `checks` entry has exactly
+  members `status="PLAN_ONLY"`, `checks`, `unknown`, and `note`, plus `test_selection` only when
+  `--provider` is given (ETS-V0-002, `docs/specs/external-test-selection-v0.md`). Each `checks` entry has exactly
   `command`, `kind` (`mandatory` or `advisory`), `reason` (one sentence), and `source` (a repository
   path or `affected-plan`). A `mandatory` entry MUST come only from a repository-owned declaration
   read from the working tree at the root: a `gate:` target in `Makefile` yields `make gate`, and a

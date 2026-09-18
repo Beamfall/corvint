@@ -410,7 +410,7 @@ func TestRootBindingAmbiguousWithTwoRootCommits(t *testing.T) {
 	head := gitIn(t, root, "rev-parse", "HEAD")
 	index := &contextindex.Index{Root: root, CommitRevision: head, Tracked: map[string]struct{}{"a.txt": {}, "b.txt": {}}}
 	record := Record1{Repositories: []Repository1{{ID: "left", Origin: first, Revision: head}, {ID: "right", Origin: second, Revision: head}}}
-	states, primary := repositoryStates(context.Background(), record, resolveBindings(context.Background(), index, nil))
+	states, primary := repositoryStates(context.Background(), record, resolveBindings(context.Background(), indexRoot(index), nil))
 	if primary != "" || states["left"].binding != BindingAmbiguous || states["right"].binding != BindingAmbiguous {
 		t.Fatalf("two declared roots of one checkout must not choose one: primary=%q left=%s right=%s", primary, states["left"].binding, states["right"].binding)
 	}
