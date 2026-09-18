@@ -437,17 +437,22 @@ func mode(t *testing.T, name string) os.FileMode {
 }
 
 const fixtureGoAnalyzer = `package main
-import ("crypto/sha256"; "encoding/base64"; "encoding/json"; "fmt"; "os")
+import ("crypto/sha256"; "encoding/base64"; "encoding/json"; "fmt"; "os"; "strings")
 func main() {
- var r map[string]any
+ var r map[string]json.RawMessage
  if err:=json.NewDecoder(os.Stdin).Decode(&r);err!=nil{os.Exit(2)}
- echoes:=[]any{}; reason:=""; prior:=""
- for i,raw:=range r["inputs"].([]any){x:=raw.(map[string]any);handle:=x["handle"].(string);echoes=append(echoes,map[string]any{"handle":handle,"sha256":x["sha256"]});if i>0&&prior>=handle{reason="DUPLICATE_VALUE"};prior=handle
-  content,err:=base64.StdEncoding.Strict().DecodeString(x["content_base64"].(string));actual:="invalid";if err==nil{actual=fmt.Sprintf("sha256:%x",sha256.Sum256(content))};if actual!=x["sha256"]{reason="DIGEST_MISMATCH"}
+ var inputs []map[string]json.RawMessage
+ if err:=json.Unmarshal(r["inputs"],&inputs);err!=nil{os.Exit(2)}
+ echoes:=[]string{}; reason:=""; prior:=""
+ for i,x:=range inputs{var handle,sum,encoded string;json.Unmarshal(x["handle"],&handle);json.Unmarshal(x["sha256"],&sum);json.Unmarshal(x["content_base64"],&encoded)
+  echoes=append(echoes,fmt.Sprintf("{\"handle\":%s,\"sha256\":%s}",x["handle"],x["sha256"]));if i>0&&prior>=handle{reason="DUPLICATE_VALUE"};prior=handle
+  content,err:=base64.StdEncoding.Strict().DecodeString(encoded);actual:="invalid";if err==nil{actual=fmt.Sprintf("sha256:%x",sha256.Sum256(content))};if actual!=sum{reason="DIGEST_MISMATCH"}
  }
- out:=map[string]any{"profile":"corvint-analyzer-candidate/experimental","family":r["family"],"request_id":r["request_id"],"status":"CANDIDATE","scope_id":r["scope_id"],"compilation_unit_id":r["compilation_unit_id"],"target":r["target"],"input_echoes":echoes}
- if reason!=""{out["status"]="REJECTED";out["reason"]=reason}else{out["facts"]=[]any{}}
- json.NewEncoder(os.Stdout).Encode(out)
+ status,tail:="CANDIDATE","\"facts\":[]"
+ if reason!=""{status,tail="REJECTED",fmt.Sprintf("\"reason\":%q",reason)}
+ // The frame is byte-compared against the harness's struct-ordered canonical encoding, so the
+ // request's raw members are echoed in declaration order rather than through a sorted map.
+ fmt.Fprintf(os.Stdout,"{\"profile\":\"corvint-analyzer-candidate/experimental\",\"family\":%s,\"request_id\":%s,\"status\":%q,\"scope_id\":%s,\"compilation_unit_id\":%s,\"target\":%s,\"input_echoes\":[%s],%s}\n",r["family"],r["request_id"],status,r["scope_id"],r["compilation_unit_id"],r["target"],strings.Join(echoes,","),tail)
 }
 `
 

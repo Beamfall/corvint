@@ -818,7 +818,7 @@ run_citation_case over-row-bound "$citation_artifacts/257.tsv" 1 0
 cmp "$citation_artifacts/prepared.json" "$citation_case/final.json"
 # Exactly 4 MiB across 256 bounded argv rows; then a shape-valid byte overflow.
 awk 'BEGIN { prefix="1\t"; suffix="\t1:1\tspecification\n";
-  path=sprintf("%*s",16384-length(prefix)-length(suffix),""); gsub(/ /,"x",path);
+  n=16384-length(prefix)-length(suffix); path=""; while (length(path) < n) path=path "x";
   for (i=0; i<256; i++) printf "%s%s%s",prefix,path,suffix }' > "$citation_artifacts/4mib.tsv"
 test "$(wc -c < "$citation_artifacts/4mib.tsv" | tr -d '[:space:]')" = 4194304
 run_citation_case at-byte-bound "$citation_artifacts/4mib.tsv" 0 256

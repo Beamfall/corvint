@@ -41,6 +41,9 @@ type blackBoxAuthorityBundle struct {
 }
 
 func TestProductionProviderBlackBoxAcquisitionAndChildExecution(t *testing.T) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Skip("GLTP-V0-049: the provider executes only on darwin/arm64")
+	}
 	root := repositoryRoot(t)
 	base := resolvedTemporary(t)
 	providerExecutable := testProviderExecutable(t, root)

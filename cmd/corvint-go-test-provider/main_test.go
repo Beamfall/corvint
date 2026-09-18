@@ -129,8 +129,13 @@ func TestProviderCommandFailsClosedAtEveryAuthorityBoundary(t *testing.T) {
 		if exitCode := run(arguments, &stdout, &stderr); exitCode != 2 {
 			t.Fatalf("run(%q) exit = %d, want 2", arguments, exitCode)
 		}
+		// GLTP-V0-049: full local authority reaches the platform gate first off darwin/arm64.
+		code := `"code":"IDENTITY_MISMATCH"`
+		if len(arguments) == 2 && !supportedProviderHost() {
+			code = `"code":"UNSUPPORTED_PLATFORM"`
+		}
 		if !strings.Contains(stdout.String(), `"profile":"go-live-error/0"`) ||
-			!strings.Contains(stdout.String(), `"code":"IDENTITY_MISMATCH"`) ||
+			!strings.Contains(stdout.String(), code) ||
 			!strings.Contains(stdout.String(), `"runId":null`) || !strings.HasSuffix(stdout.String(), "\n") {
 			t.Fatalf("run(%q) output = %q", arguments, stdout.String())
 		}
@@ -138,6 +143,9 @@ func TestProviderCommandFailsClosedAtEveryAuthorityBoundary(t *testing.T) {
 }
 
 func TestProviderCommandUsesPinnedLiveParentAuthorityE2E(t *testing.T) {
+	if !supportedProviderHost() {
+		t.Skip("GLTP-V0-049: the provider executes only on darwin/arm64")
+	}
 	type fixture struct {
 		bundle     authorityBundle
 		bundlePath string

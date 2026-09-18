@@ -24,13 +24,16 @@ import (
 )
 
 const (
-	fixtureFormat             = "atlas-cli-parity-fixture/0"
-	fixtureGitConfig          = "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n"
-	maximumGitInputBytes      = 128 << 20
-	maximumGitOutputBytes     = 1 << 20
-	maximumGitArchiveBytes    = 128 << 20
-	gitProcessTimeout         = 30 * time.Second
-	gitProcessShutdownTimeout = 2 * time.Second
+	fixtureFormat    = "atlas-cli-parity-fixture/0"
+	fixtureGitConfig = "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n"
+	// The frozen manifest digests .git/config as macOS git init writes it; git on other hosts
+	// omits ignorecase and precomposeunicode, so materialization pins these bytes after init.
+	fixtureInitializedGitConfig = fixtureGitConfig + "\tbare = false\n\tlogallrefupdates = true\n\tignorecase = true\n\tprecomposeunicode = true\n"
+	maximumGitInputBytes        = 128 << 20
+	maximumGitOutputBytes       = 1 << 20
+	maximumGitArchiveBytes      = 128 << 20
+	gitProcessTimeout           = 30 * time.Second
+	gitProcessShutdownTimeout   = 2 * time.Second
 )
 
 type fixtureSpec struct {
@@ -109,6 +112,9 @@ func materializeFixture(ctx context.Context, fixturesRoot, id, destination strin
 		return materializedFixture{}, err
 	}
 	if _, err := git.run(ctx, "init", "--quiet", "--object-format=sha1", "--initial-branch=main", "--template="+template); err != nil {
+		return materializedFixture{}, err
+	}
+	if err := os.WriteFile(filepath.Join(destination, ".git", "config"), []byte(fixtureInitializedGitConfig), 0o666); err != nil {
 		return materializedFixture{}, err
 	}
 	commit, err := importFixtureCommits(ctx, git, spec)

@@ -446,8 +446,10 @@ func TestProveCEMAttestRefusesAMapPathThatIsNotUTF8(t *testing.T) {
 	common := []string{"--expected-base", base, "--target", "HEAD", "--attest"}
 	err = os.WriteFile(filepath.Join(root, filepath.FromSlash(name)), mapBytes, 0o644)
 	if err == nil {
+		// The file system accepted the name, so the map is itself a non-UTF-8 untracked path
+		// and the worktree status read refuses before attestation is reached.
 		_, stdout, stderr, code := runProveCLI(t, root, append([]string{"--cem", name}, common...)...)
-		if code != 2 || len(stdout) != 0 || !strings.Contains(stderr, `"attest-failed"`) {
+		if code != 2 || len(stdout) != 0 || !strings.Contains(stderr, `"unsupported-prove-history"`) {
 			t.Fatalf("exit=%d stdout=%q stderr=%q", code, stdout, stderr)
 		}
 		return
