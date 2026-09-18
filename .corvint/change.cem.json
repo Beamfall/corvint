@@ -72,14 +72,14 @@
         }
       ],
       "disposition": "supported",
-      "id": "hunk:sha256:9062e1bacd88dd40afcaab78bf7b99479d1e4e71564a4df84360488d0423493c",
+      "id": "hunk:sha256:c394ea060e27383394d995a227fcac566d3ad1d12e25156973c0b0952e0c8eb2",
       "newRange": {
-        "count": 3,
-        "start": 12
+        "count": 8,
+        "start": 13
       },
       "oldRange": {
-        "count": 6,
-        "start": 12
+        "count": 5,
+        "start": 13
       },
       "path": "docs/agent-memory/tests.md",
       "reason": "evidence-backed"
@@ -645,6 +645,6 @@
       "reason": "evidence-backed"
     }
   ],
-  "patchSha256": "9c9079dded326703d17a185b7c542feb5b048bb4b2996e4a2a6d03990ea505ba",
+  "patchSha256": "dc9dca5bd80ca82c96509a2902c23ca1ee35262df1646aead6cd82d97ed4d3d9",
   "spec": "cem/0.2"
 }
