@@ -123,7 +123,12 @@ func TestWatchIdleHumanEditAndDeletionStop(t *testing.T) {
 func TestWatchUnrelatedAndDirtyChangesDoNotWrite(t *testing.T) {
 	t.Run("SDD-V0-008 cited source eligibility", func(t *testing.T) {
 		root, selector, policy := watchFixture(t)
-		policy.MaxWallClock = time.Second
+		// Cycle 1 writes (identity calls 1-3), cycle 2 sees the unrelated commit
+		// and the dirty file (4-6), and cycle 3 stops the session (7). The wall
+		// clock is only a hang bound, so host load cannot end the session early.
+		policy.MaxWallClock = time.Minute
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		ops := watchOps()
 		calls := 0
 		ops.identity = func(ctx context.Context, root string) (sourceIdentity, error) {
@@ -134,10 +139,14 @@ func TestWatchUnrelatedAndDirtyChangesDoNotWrite(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if calls == 7 {
+				cancel()
+				return readSourceIdentity(context.Background(), root)
+			}
 			return readSourceIdentity(ctx, root)
 		}
-		receipt, err := watch(context.Background(), root, "docs/page.md", selector, policy, 10*time.Millisecond, ops)
-		if err != nil || receipt.Writes != 1 || strings.Contains(readPage(t, root), "func Dirty") {
+		receipt, err := watch(ctx, root, "docs/page.md", selector, policy, 10*time.Millisecond, ops)
+		if err != nil || receipt.StoppedReason != "interrupted" || receipt.Cycles != 3 || receipt.Writes != 1 || strings.Contains(readPage(t, root), "func Dirty") {
 			t.Fatalf("%+v %v", receipt, err)
 		}
 	})
