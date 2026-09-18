@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 620" role="img" aria-labelledby="title desc">
+  <title id="title">Corvint</title>
+  <desc id="desc">The Corvint open-route C mark and custom uppercase wordmark, rendered in white with a black keyline.</desc>
+  <defs>
+    <path id="mark" d="M800 180C720 80 610 40 480 50C230 65 70 220 70 425C70 630 230 785 480 800C610 810 720 770 800 670L720 600" />
+    <g id="word">
+      <path d="M170 35Q135 0 85 0Q0 0 0 140T85 280Q135 280 170 245" />
+      <path d="M230 140Q230 0 320 0T410 140Q410 280 320 280T230 140" />
+      <path d="M480 280V0H570Q650 0 650 75T570 150H480M570 150 665 280" />
+      <path d="M720 0 810 280 900 0" />
+      <path d="M970 0V280" />
+      <path d="M1050 280V0L1230 280V0" />
+      <path d="M1300 0H1500M1400 0V280" />
+    </g>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#mark" transform="translate(24 38) scale(.64)" stroke="#050505" stroke-width="112" />
+    <use href="#mark" transform="translate(24 38) scale(.64)" stroke="#f8fafc" stroke-width="88" />
+    <use href="#word" transform="translate(760 170)" stroke="#050505" stroke-width="78" />
+    <use href="#word" transform="translate(760 170)" stroke="#f8fafc" stroke-width="54" />
+  </g>
+</svg>

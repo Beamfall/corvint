@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 850" role="img" aria-labelledby="title desc">
+  <title id="title">Corvint mark</title>
+  <desc id="desc">A continuous white route with a black keyline forms an open letter C.</desc>
+  <path d="M800 180C720 80 610 40 480 50C230 65 70 220 70 425C70 630 230 785 480 800C610 810 720 770 800 670L720 600" fill="none" stroke="#050505" stroke-linecap="round" stroke-linejoin="round" stroke-width="112" />
+  <path d="M800 180C720 80 610 40 480 50C230 65 70 220 70 425C70 630 230 785 480 800C610 810 720 770 800 670L720 600" fill="none" stroke="#f8fafc" stroke-linecap="round" stroke-linejoin="round" stroke-width="88" />
+</svg>
