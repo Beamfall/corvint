@@ -185,7 +185,9 @@ func TestWorkRunnerExecutableSwap(t *testing.T) {
 		if err := os.Symlink("/bin/sh", interpreter); err != nil {
 			t.Fatal(err)
 		}
-		runner := workTestRunner(t, context.Background(), "#!"+interpreter+"\nrm '"+interpreter+"'\nln -s /bin/sh '"+interpreter+"'\nprintf ok\n")
+		// Keep the old link allocated: Linux file systems reuse a freed inode number at once,
+		// which would make an rm-then-ln replacement indistinguishable to os.SameFile.
+		runner := workTestRunner(t, context.Background(), "#!"+interpreter+"\nmv '"+interpreter+"' '"+interpreter+".old'\nln -s /bin/sh '"+interpreter+"'\nprintf ok\n")
 		_, receipt, err := runner.run("snapshot", []string{}, 100)
 		if err == nil || receipt.State != "INCOMPLETE" {
 			t.Fatalf("interpreter drift: %+v %v", receipt, err)

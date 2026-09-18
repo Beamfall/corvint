@@ -803,6 +803,11 @@ func TestStageKeepsReusedEntryWhenCancelled(t *testing.T) {
 }
 
 func TestRunRejectsRepositoryAndStagingContainment(t *testing.T) {
+	if !containedBackendSupported() {
+		// Containment is checked while staging; without a backend Run refuses before
+		// staging, which TestUnsupportedBackendDoesNotStageOrReplaceStatus pins.
+		t.Skip("no contained backend on this platform")
+	}
 	plan := testPlan(t, "request")
 	plan.RepositoryRoot = filepath.Dir(plan.Executable)
 	if result, err := Run(context.Background(), plan); !Is(err, IdentityUnsafe) || result.Started || !result.ValidCleanupObservation() {

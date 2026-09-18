@@ -218,6 +218,9 @@ func materializeFixtureWithGitIndex(ctx context.Context, fixturesRoot, id, desti
 	if _, err := git.run(ctx, "init", "--quiet", "--object-format=sha1", "--initial-branch=main", "--template="+template); err != nil {
 		return materializedFixture{}, err
 	}
+	if err := os.WriteFile(filepath.Join(destination, ".git", "config"), []byte(fixtureInitializedGitConfig), 0o666); err != nil {
+		return materializedFixture{}, err
+	}
 	var tracked []fixtureEntry
 	for _, entry := range spec.Files {
 		if entry.Type == "directory" || entry.Type == "untracked-file" {

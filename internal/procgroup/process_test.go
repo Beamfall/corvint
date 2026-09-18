@@ -466,7 +466,12 @@ func spawnProcessDescendant(pidFile, sideEffect string) {
 		os.Exit(125)
 	}
 	processes := fmt.Sprintf("%d %d", os.Getpid(), command.Process.Pid)
-	if err := os.WriteFile(pidFile, []byte(processes), 0o666); err != nil {
+	// Write then rename, so waitForProcessFile never observes an empty pid file.
+	if err := os.WriteFile(pidFile+".tmp", []byte(processes), 0o666); err != nil {
+		_ = command.Process.Kill()
+		os.Exit(125)
+	}
+	if err := os.Rename(pidFile+".tmp", pidFile); err != nil {
 		_ = command.Process.Kill()
 		os.Exit(125)
 	}

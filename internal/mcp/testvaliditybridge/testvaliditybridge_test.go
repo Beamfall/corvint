@@ -170,6 +170,9 @@ func TestReceiptRefusesCaseFoldedGitDirectory(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".git", "HEAD"), []byte("inside-git"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := os.Stat(filepath.Join(root, ".GIT")); err != nil {
+		t.Skip("case-sensitive file system: .GIT does not name the Git directory")
+	}
 	identity, err := os.Stat(root)
 	if err != nil {
 		t.Fatal(err)

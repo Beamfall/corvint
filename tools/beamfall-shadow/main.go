@@ -836,14 +836,27 @@ func responseBinding(id dogfoodIdentity, request, output, stderr, kind, status s
 	}
 	return digest(raw)
 }
+
+// receiptBinding binds the BSD-003 fields only. Each run contributes its response
+// binding and bounded result; wall/RSS measurements and descriptor identities are
+// BSD-005 observations that differ on every execution, so they stay out of it.
 func receiptBinding(r receipt) string {
+	type boundRunResult struct {
+		Response string `json:"response"`
+		Outcome  string `json:"outcome"`
+		Reason   string `json:"reason"`
+	}
+	runs := make([]boundRunResult, 0, len(r.Runs))
+	for _, run := range r.Runs {
+		runs = append(runs, boundRunResult{run.ResponseBindingSHA256, run.Outcome, run.Reason})
+	}
 	raw, err := json.Marshal(struct {
-		Identity dogfoodIdentity `json:"identity"`
-		Request  string          `json:"request"`
-		Outcome  string          `json:"outcome"`
-		Reason   string          `json:"reason"`
-		Runs     []runReceipt    `json:"runs"`
-	}{r.Identity, r.RequestSHA256, r.Outcome, r.Reason, r.Runs})
+		Identity dogfoodIdentity  `json:"identity"`
+		Request  string           `json:"request"`
+		Outcome  string           `json:"outcome"`
+		Reason   string           `json:"reason"`
+		Runs     []boundRunResult `json:"runs"`
+	}{r.Identity, r.RequestSHA256, r.Outcome, r.Reason, runs})
 	if err != nil {
 		return "NOT_AVAILABLE"
 	}
