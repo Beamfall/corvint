@@ -169,6 +169,7 @@ every advice list at 64 rows with omissions counted (`ETS-V0-010`).
   (`EEP-V2-008`).
 - Inspecting a `--repository` checkout's worktree contents; a checkout binds identity only, and its
   canonical path is never opened for inspection beyond the Git metadata EEP-V1 already reads.
-- Feeding external evidence into the Change Frontier sidecar. That consumption path is in progress
-  in a separate PR; V0 explicitly keeps external items out of the Change Frontier until then
-  (`EEP-V0-015`).
+- Feeding external evidence into the Change Frontier itself. External items stay out of the frontier
+  wire (`EEP-V0-015`); `corvint obligations --cem FILE --impact FILE` instead writes a separate,
+  reference-only `external-frontier-obligations/0` sidecar
+  (`docs/specs/external-frontier-obligations-v0.md`) that nothing reads.

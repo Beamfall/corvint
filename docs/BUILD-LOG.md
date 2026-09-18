@@ -27,9 +27,17 @@ authority-assignment rules hold on the documented worked example; it is not an a
 
 Unsupported in this slice, per `external-evidence-provider-v0.md` and `external-test-selection-v0.md`:
 command, MCP, and remote provider transports (file transport only); multi-hop obligations beyond one
-relation hop; checkout worktree inspection for a V1 checkout binding (a checkout's canonical path is
-echoed, never opened); and the Change Frontier sidecar for external obligations, which is in
-progress in a separate PR. None of these are measured above; none are estimated.
+relation hop; and checkout worktree inspection for a V1 checkout binding (a checkout's canonical path
+is echoed, never opened). None of these are measured above; none are estimated. The Change Frontier
+sidecar for external obligations landed separately (EFO-V0, entry below) and is not measured here.
+
+## 2026-09-18 EFO-V0 external obligations sidecar: reference-only join to the frontier
+
+Decision 0313. `corvint obligations --cem FILE --impact FILE` writes `external-frontier-obligations/0`
+(`docs/specs/external-frontier-obligations-v0.md`). The CEM and frontier wires are unchanged; the
+sidecar cites the frontier through `binding.cem_sha256` (the `CF-V0-019` raw-copy digest) and CEM hunk
+ids, and nothing reads it. Tested by `TestObligations*` in `internal/extevidence` and `cmd/corvint`;
+no adopter receipt or labelled review sample exists yet, so promotion stays open.
 
 ## 2026-09-18 EEP-V2 path-to-path relations: synthetic conformance evaluation
 

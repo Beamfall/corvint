@@ -674,6 +674,24 @@
     ]
   },
   {
+    "path": "docs/specs/external-frontier-obligations-v0.md",
+    "title": "External Frontier Obligations V0 — a reference-only Change Frontier sidecar",
+    "reqPrefix": "EFO-V0",
+    "intent": "accepted (decision 0313)",
+    "delivery": "experimental (file transport only)",
+    "claim": "`corvint obligations --cem FILE --impact FILE` writes an `external-frontier-obligations/0` sidecar that joins every CEM hunk to the external entities, obligations, tests, and explicit unknowns an impact receipt reports, bound to both inputs by digest and carrying no authority.",
+    "dependsOn": [
+      "docs/specs/change-frontier-v0.md",
+      "docs/specs/external-evidence-provider-v0.md"
+    ],
+    "supersededBy": null,
+    "closableToday": false,
+    "implementation": [
+      "cmd/corvint",
+      "internal/extevidence"
+    ]
+  },
+  {
     "path": "docs/specs/external-test-selection-v0.md",
     "title": "External Test Selection V0 — fail-closed advice from verification relations",
     "reqPrefix": "ETS-V0",
