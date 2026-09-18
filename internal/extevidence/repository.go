@@ -245,6 +245,7 @@ func view1(ctx context.Context, root rootRepository, record Record1, bound *bind
 			if side.isPath() {
 				pinned[side.repository] = append(pinned[side.repository], side.path)
 			}
+			pinned[primary] = append(pinned[primary], v.held(side, root.changed)...)
 		}
 	}
 	for id, state := range states {
@@ -256,6 +257,17 @@ func view1(ctx context.Context, root rootRepository, record Record1, bound *bind
 		}
 	}
 	return v
+}
+
+// held lists the changed root paths a V2 directory scope holds.
+func (v *view) held(side endpoint, changed []string) []string {
+	var out []string
+	for _, path := range changed {
+		if v.pathToPath && side.contains(endpoint{repository: v.primary, path: path}) {
+			out = append(out, path)
+		}
+	}
+	return out
 }
 
 func (v *view) resolve1(relation *Relation1) (link, *unknown) {

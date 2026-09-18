@@ -126,7 +126,8 @@ local path, branch name, display name, or record filename is never an identity.
 - A Golf- or product-specific adapter, hosting-service synchronization, automatic clone or fetch,
   remote transport, test-selection policy, CEM or Change Frontier integration, embeddings, and
   automatic relationship repair.
-- Path-to-path composition. Relate each path to an entity instead. The ideas backlog carries it.
+- Path-to-path composition. Relate each path to an entity instead; the opt-in V2 profile
+  (`EEP-V2`) composes path relations.
 - Remote normalization. A normalizer would have to decide equivalence between hosting URLs, which
   is policy, not identity.
 - The simpler baseline is V0 plus one provider record per repository. It cannot state the

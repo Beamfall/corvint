@@ -119,7 +119,9 @@ type selector struct {
 // root commit revision. It reads provider records and Git objects only,
 // executes nothing, and never fails: every problem is a structured entry.
 func Selection(ctx context.Context, dir, revision string, sources []string, checkouts []Checkout, input SelectionInput) map[string]any {
-	providers, repository, _ := loadAll(ctx, headRoot(dir, revision), sources, checkouts)
+	root := headRoot(dir, revision)
+	root.changed = input.Changed
+	providers, repository, _ := loadAll(ctx, root, sources, checkouts)
 	s := newSelector(input)
 	for _, entry := range providers {
 		if entry.state != StateLoaded {
@@ -241,11 +243,54 @@ func (s *selector) widenPaths(v *view) {
 }
 
 func (s *selector) widenPath(v *view, changed, other endpoint) {
-	if !v.isChanged(changed, s.changed) || s.pathObligation(v, other) != nil {
+	if !s.touchesChanged(v, changed) || s.pathObligation(v, other) != nil {
 		return
 	}
 	key := v.provider + "\x00" + other.repository + "\x00" + other.path
 	s.paths[key] = &obligation{provider: v.provider, subject: other.repository + ":" + other.path, repository: other.repository, path: other.path, reasons: map[string]struct{}{}}
+}
+
+// touchesChanged reports a changed root path, or a directory scope that holds
+// one (EEP-V2-012).
+func (s *selector) touchesChanged(v *view, side endpoint) bool {
+	if v.isChanged(side, s.changed) {
+		return true
+	}
+	for _, path := range s.input.Changed {
+		if side.contains(endpoint{repository: v.primary, path: path}) {
+			return true
+		}
+	}
+	return false
+}
+
+// descendants lists, in key order, the path obligations a directory scope
+// holds: changed root paths and this record's widened paths (EEP-V2-012).
+func (s *selector) descendants(v *view, scope endpoint) []*obligation {
+	if !v.pathToPath || !scope.isScope() {
+		return nil
+	}
+	keys := make([]string, 0, len(s.paths))
+	for key := range s.paths {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var out []*obligation
+	for _, key := range keys {
+		if at, ok := s.paths[key].at(v); ok && scope.contains(at) {
+			out = append(out, s.paths[key])
+		}
+	}
+	return out
+}
+
+// at is the endpoint a path obligation names in v: a changed root path, or a
+// path v's own provider widened to.
+func (target *obligation) at(v *view) (endpoint, bool) {
+	if target.repository == "" {
+		return endpoint{repository: v.primary, path: target.subject}, v.primary != ""
+	}
+	return endpoint{repository: target.repository, path: target.path}, target.provider == v.provider
 }
 
 // pathObligation returns the obligation a path endpoint names, if any: a
@@ -300,10 +345,36 @@ func (s *selector) test(entry provider, v *view, candidate link, obligations map
 }
 
 // pathTest evaluates one path-to-path verification or context relation: from
-// is the test, to is the subject it verifies. It folds into every path
-// obligation either side names, and qualifies only when both sides pass
-// (EEP-V2-006, EEP-V2-007).
+// is the test, to is the subject it verifies. A directory-scope subject is
+// evaluated once per obligation it holds; a test side inside that scope is one
+// of them, so only a test side outside it is evaluated against the scope
+// itself (EEP-V2-012).
 func (s *selector) pathTest(entry provider, v *view, candidate link) {
+	if !candidate.to.contains(candidate.from) {
+		s.exactPathTest(entry, v, candidate)
+	}
+	for _, target := range s.descendants(v, candidate.to) {
+		s.scopeTest(entry, v, candidate, target)
+	}
+}
+
+// scopeTest checks the subject side as the held obligation's own path, so
+// every covered path passes identity, freshness, verification, and the
+// worktree on its own, and gets its own row.
+func (s *selector) scopeTest(entry provider, v *view, candidate link, target *obligation) {
+	scoped := candidate
+	scoped.to, _ = target.at(v)
+	code := s.pathCode(entry, v, scoped)
+	s.record(target, code, v.provider, target.subject)
+	row := s.pathRow(entry, v, scoped, code)
+	row.row["subject_scope"] = v.label(candidate.to)
+	row.row["reason"] = fmt.Sprintf("%s, covered by directory scope %s", row.row["reason"], v.label(candidate.to))
+	s.place(row, code)
+}
+
+// exactPathTest folds a relation into every path obligation either side
+// names, and qualifies only when both sides pass (EEP-V2-006, EEP-V2-007).
+func (s *selector) exactPathTest(entry provider, v *view, candidate link) {
 	var targets []*obligation
 	for _, side := range []endpoint{candidate.from, candidate.to} {
 		if target := s.pathObligation(v, side); target != nil && (len(targets) == 0 || targets[0] != target) {
@@ -313,16 +384,24 @@ func (s *selector) pathTest(entry provider, v *view, candidate link) {
 	if len(targets) == 0 {
 		return
 	}
-	code := firstCode(
+	code := s.pathCode(entry, v, candidate)
+	for _, target := range targets {
+		s.record(target, code, v.provider, target.subject)
+	}
+	s.place(s.pathRow(entry, v, candidate, code), code)
+}
+
+// pathCode applies the relation checks, then the test side, then the subject.
+func (s *selector) pathCode(entry provider, v *view, candidate link) string {
+	return firstCode(
 		func() string { return s.weakCode(candidate.relation.Type, candidate.relation.Evidence) },
 		func() string { return unsupportedCode(candidate.relation.Type) },
 		func() string { return s.sideCode(entry, v, candidate.from) },
 		func() string { return renamed(sourceCodes, s.sideCode(entry, v, candidate.to)) },
 	)
-	for _, target := range targets {
-		s.record(target, code, v.provider, target.subject)
-	}
-	row := s.pathRow(entry, v, candidate, code)
+}
+
+func (s *selector) place(row selectionRow, code string) {
 	if code == "" {
 		s.selected = append(s.selected, row)
 		return
@@ -496,9 +575,11 @@ func (s *selector) unknown(v *view, failure unknown, obligations map[string]stru
 func (s *selector) touched(v *view, failure unknown, obligations map[string]struct{}) []*obligation {
 	var targets []*obligation
 	for _, raw := range rawEndpoints(failure) {
-		if target := s.pathObligation(v, endpoint{repository: raw.Repository, path: raw.Path}); raw.Path != "" && target != nil {
+		side := endpoint{repository: raw.Repository, path: raw.Path}
+		if target := s.pathObligation(v, side); raw.Path != "" && target != nil {
 			targets = append(targets, target)
 		}
+		targets = append(targets, s.descendants(v, side)...)
 		if _, affected := obligations[raw.Entity]; raw.Entity != "" && affected && raw.Provider == v.provider {
 			targets = append(targets, s.entity(v.provider, raw.Entity))
 		}

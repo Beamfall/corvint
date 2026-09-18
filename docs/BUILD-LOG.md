@@ -10,11 +10,13 @@ working records and are referenced from decisions and specifications as historic
 ## 2026-09-18 EEP-V2 path-to-path relations: synthetic conformance evaluation
 
 Decision 0312. `TestSelectionEvaluation` now runs over both labelled corpora: the 23 ETS-V0 cases,
-plus 30 cases in the independent two-repository fixture
-`internal/extevidence/testdata/conformance-path/cases.json`, 53 in all. Results: precision 1.000
-(29 of 29 selected tests expected), unsafe narrowing 0 of 42 cases that must not narrow,
-abstention accuracy 6 of 6, latency p50 about 89 ms and max about 138 ms per case on one
-development host, and a largest `test_selection` member of 5316 bytes. The V1 and no-provider CLI
+plus 40 cases in the independent two-repository fixture
+`internal/extevidence/testdata/conformance-path/cases.json`, 63 in all. Ten of the path cases
+cover directory scopes (`EEP-V2-012`, `EEP-V2-013`): a held path, a changed test inside the scope,
+a scope that widens, and missing, dirty, other-repository, and slash-less cases that must not
+narrow. Results: precision 1.000 (36 of 36 selected tests expected), unsafe narrowing 0 of 49 cases
+that must not narrow, abstention accuracy 6 of 6, latency p50 about 98 ms and max about 181 ms per
+case on one loaded development host, and a largest `test_selection` member of 5393 bytes. The V1 and no-provider CLI
 tests keep their bytes. A V1 record carrying the same path relation stays an `unsupported`
 unknown, which is why `TestAffectedSelectionPathRelation` gives `full` under V1 and `narrow` under
 V2. The corpus is synthetic and was authored with the feature. It shows that the per-side and

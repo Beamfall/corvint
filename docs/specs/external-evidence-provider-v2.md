@@ -11,7 +11,7 @@ decisions 0310 and 0311, and the feature request Beamfall/corvint#7.
 ## Agent digest
 - Claim: An `external-evidence-provider/2` record may relate two repository-qualified paths; each side is verified on its own and the relation takes the worse state.
 - Status: accepted (decision 0312, a delegated call on Beamfall/corvint#7)/experimental (file transport only); checked by `TestSelectionConformance`, `TestSelectionEvaluation`, `TestPathRelationsImpact`, and `TestAffectedSelectionPathRelation`.
-- Exists: `Schema2` in `internal/extevidence/record1.go`, `pathRelationsOf` in `compose.go`, `pathTest`, `widenPaths`, and `pathRow` in `selection.go`, and the independent two-repository fixture under `internal/extevidence/testdata/conformance-path/`.
+- Exists: `Schema2` in `internal/extevidence/record1.go`, `pathRelationsOf` in `compose.go`, `pathTest`, `scopeTest`, `widenPaths`, and `pathRow` in `selection.go`, `checkScope2` in `record1.go`, and the independent two-repository fixture under `internal/extevidence/testdata/conformance-path/`.
 - Blocked on: an ACC-V0 provider profile before any executed transport; an independent adopter record before promotion.
 - Read next: Requirements; Trust boundary, limits, and failure modes.
 
@@ -38,6 +38,8 @@ backlog carried this as a V1 follow-up.
   `from` is the test and `to` is the path it verifies.
 - **Path obligation**: a changed root path (ETS-V0), or the other endpoint of a non-verification,
   non-context path relation on a changed root path (`EEP-V2-008`).
+- **Directory scope**: a V2 path endpoint whose path ends in `/`. It **holds** every path
+  obligation in the same repository whose path starts with it and is longer than it.
 - **Worst side**: the relation state ordered `unresolved` > `stale` > `not-verified` > `fresh`.
 
 ## Requirements
@@ -90,15 +92,29 @@ backlog carried this as a V1 follow-up.
   positive, negative, stale, missing, ambiguous, unsupported, and abstention cases. The
   `TestSelectionEvaluation` measures (precision, unsafe narrowing, abstention accuracy, latency,
   receipt size) MUST run over it with unsafe narrowing 0.
+- `EEP-V2-012`: A V2 directory-scope endpoint MUST NOT pin a blob; such a record is invalid. As the
+  subject of a verification or context path relation, a scope MUST be evaluated once per path
+  obligation it holds, with the subject side checked as that obligation's own path under
+  `EEP-V2-006` and `EEP-V2-007` (identity, binding, freshness, tracked at the side's revision, and
+  the root worktree). Each evaluation folds into the held obligation only and yields its own row,
+  whose `subject` is the held path and whose `subject_scope` names the declared scope. A test side
+  that the scope holds is evaluated only as a held obligation; a test side outside the scope is
+  evaluated against the scope itself, which is never a tracked path, and blocks. A path without a
+  trailing `/` never holds anything.
+- `EEP-V2-013`: A non-verification, non-context path relation whose scope endpoint holds a changed
+  root path MUST widen to its other endpoint under `EEP-V2-008`. A widened scope is never tracked, so
+  it stays uncovered. An unresolved V2 relation whose raw endpoint is a scope MUST block every
+  obligation that scope holds.
 
 ## Non-goals and simpler baseline
 
 No inference of path relations from names, imports, routes, co-change, or similarity. No anchor
 repair, no product-specific relation types in Core, no executed tests, no change to mandatory
 checks, the CEM, or the Change Frontier, and no remote transport. The simpler baseline, an
-intermediate entity, still works unchanged and remains the only option under V1. A subject side
-that is a descendant of a changed path, rather than the path itself, is not qualified in this
-slice.
+intermediate entity, still works unchanged and remains the only option under V1. A directory is
+never implied: only a declared trailing `/` makes a scope, and V1 gives it no meaning. Impact
+`path_relations` stays exact-match: a scope relation appears there only when a side is itself a
+changed path.
 
 ## Trust boundary, limits, and failure modes
 
@@ -117,16 +133,20 @@ Limits are the V1 record bounds plus the section and selection list limits.
 | Ambiguous identity / checkout of other history | `ambiguous-repository-identity` / `repository-binding-mismatch`, blocking |
 | `candidate`, `navigates`, `inferred`, or `covers` under strict | coded candidate; obligation stays uncovered |
 | `implements`, `generates`, `consumes`, `depends-on`, namespaced | widens one hop; never qualifies |
+| Directory scope pinning a blob (V2) | invalid record |
+| Held path missing, stale, or dirty | that path's code, blocking; other held paths are evaluated on their own |
+| Test side outside the scope it verifies | `missing-path-reference`, blocking |
 
 ## Deterministic acceptance and testing matrix
 
 | Case | Expected | Test |
 |---|---|---|
-| 30 labelled cases in `conformance-path/cases.json` | labelled state, codes, and selected tests | `TestSelectionConformance` |
+| 40 labelled cases in `conformance-path/cases.json` | labelled state, codes, and selected tests | `TestSelectionConformance` |
 | Evaluation over both corpora | unsafe 0, precision 1, abstention exact | `TestSelectionEvaluation` |
 | Path row fields and worst-side state | full provenance, both sides | `TestPathRowProvenance` |
 | Reversed relations; limit 1 | identical bytes; counted omission | `TestPathDeterministicAndBounded` |
 | Relative checkout | no resolved directory or body | `TestPathPrivate` |
+| Scope row, scope blob, V1 scope, unresolved scope | held path and `subject_scope`; invalid; V1 decodes; held path blocked | `TestPathScope` |
 | Invalid V2 records; undeclared repository | invalid; `unresolved` unknown | `TestPathRecordStrict` |
 | Impact `path_relations`; V1 unchanged | two items, worst side; V1 unsupported, no member | `TestPathRelationsImpact`, `TestPathRelationsBounded` |
 | Mandatory checks | echoed unchanged | `TestSelectionMandatoryEchoedUnchanged` |
@@ -137,8 +157,8 @@ Limits are the V1 record bounds plus the section and selection list limits.
 ## Rollout, rollback, and compatibility
 
 Additive and opt-in by schema. Rollback removes `Schema2`, `pathRelationsOf`, `addPathRelations`,
-`pathTest`, `widenPaths`, `pathRow`, the path fixture and tests, the help lines, this document, and
-decision 0312. V0 and V1 records and runs without `--provider` are unchanged in both directions.
+`pathTest`, `scopeTest`, `checkScope2`, `widenPaths`, `pathRow`, the path fixture and tests, the
+help lines, this document, and decision 0312. V0 and V1 records and runs without `--provider` are unchanged in both directions.
 
 ## Traceability
 
@@ -153,11 +173,11 @@ decision 0312. V0 and V1 records and runs without `--provider` are unchanged in 
 | `EEP-V2-009` | `pathRow` in `selection.go` | `TestPathRowProvenance` |
 | `EEP-V2-010` | `result`, `pathRow`, `addPathRelations` | `TestPathDeterministicAndBounded`, `TestPathPrivate` |
 | `EEP-V2-011` | `internal/extevidence/testdata/conformance-path/` | `TestSelectionConformance`, `TestSelectionEvaluation` |
+| `EEP-V2-012` | `checkScope2`; `pathTest`, `scopeTest`, `descendants` in `selection.go`; `held` in `repository.go` | `TestSelectionConformance`, `TestPathScope` |
+| `EEP-V2-013` | `touchesChanged`, `touched` in `selection.go` | `TestSelectionConformance`, `TestPathScope` |
 
 ## Unresolved decisions and promotion or kill criteria
 
-- Qualifying a subject side that is a descendant of a changed path needs a declared qualification
-  rule; it is a follow-up in the ideas backlog.
 - Promotion needs one independent adopter's V2 record and a corpus drawn from a real change
   history, evaluated with the same measures.
 - Kill path-relation narrowing if any adopter-labelled case narrows unsafely; `path_relations`
