@@ -43,6 +43,15 @@ type endpoint struct {
 
 func (e endpoint) isPath() bool { return e.path != "" }
 
+// isScope reports a directory scope: a V2 path ending in "/" (EEP-V2-012).
+func (e endpoint) isScope() bool { return strings.HasSuffix(e.path, "/") }
+
+// contains reports whether a directory scope holds other strictly below it in
+// the same repository.
+func (e endpoint) contains(other endpoint) bool {
+	return e.isScope() && other.repository == e.repository && other.path != e.path && strings.HasPrefix(other.path, e.path)
+}
+
 // link is a resolved relation. For a V1 record, relation carries the ordering
 // keys and structured holds the record's own endpoints for output.
 type link struct {

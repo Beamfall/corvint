@@ -75,6 +75,9 @@ type rootRepository struct {
 	dir, revision string
 	allPaths      bool
 	tree          func(ctx context.Context, paths []string) tree
+	// changed lists the root paths a V2 directory scope may hold, so the
+	// tree can answer for them (EEP-V2-012).
+	changed []string
 }
 
 func indexRoot(index *contextindex.Index) rootRepository {

@@ -255,3 +255,40 @@ func TestPathRelationsBounded(t *testing.T) {
 		t.Fatalf("limit 1 keeps one path relation and counts one: %v", section["omitted"])
 	}
 }
+
+// TestPathScope: a V2 directory scope yields one row per held path, naming
+// the scope; it cannot pin a blob; an unresolved scope relation blocks every
+// path it holds (EEP-V2-012, EEP-V2-013).
+func TestPathScope(t *testing.T) {
+	t.Parallel()
+	p := newPair(t)
+	selection, _ := runPathCase(t, p, pathCase(t, "scope-positive-descendant"))
+	rows := selection["selected"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("selected = %v", rows)
+	}
+	row := rows[0].(map[string]any)
+	if row["subject"].(map[string]any)["path"] != "pkg/main.go" || row["subject_scope"] != "application:pkg/" {
+		t.Fatalf("a scope row names the held path and its scope: %v", row)
+	}
+	valid := pathRecord(t, p, "path.json", map[string]string{"SOURCE_PATH": "pkg/"})
+	pinned := func(r map[string]any) {
+		relations(r)[0].(map[string]any)["to"].(map[string]any)["blob"] = p.app.mainBlob
+	}
+	if _, err := Decode1(mutate(t, valid, pinned)); err == nil {
+		t.Fatal("a V2 directory scope must not pin a blob")
+	}
+	v1 := pathRecord(t, p, "path.json", map[string]string{"SOURCE_PATH": "pkg/", "SCHEMA": Schema1})
+	if _, err := Decode1(mutate(t, v1, pinned)); err != nil {
+		t.Fatalf("V1 keeps its rules: %v", err)
+	}
+	unresolved := writeRecord(t, t.TempDir(), "provider.json", mutate(t, valid, func(r map[string]any) {
+		relations(r)[0].(map[string]any)["from"] = map[string]any{"provider": "mockdocs", "entity": "undeclared"}
+	}))
+	c := pathCase(t, "scope-positive-descendant")
+	blocked, _ := runSelection(t, p, unresolved, bindCase(p, c), selectionInput(c))
+	uncovered := blocked["uncovered_paths"].([]any)
+	if len(uncovered) != 1 || uncovered[0].(map[string]any)["blocked"] != true {
+		t.Fatalf("an unresolved scope relation blocks the path it holds: %v", uncovered)
+	}
+}

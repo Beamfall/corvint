@@ -20,6 +20,10 @@ record shape: the schema value is the only opt-in, and a V1 record's path relati
 - **Widening.** A non-verification, non-context path relation on a changed path makes its other
   endpoint an obligation, one hop, as ETS-V0 does for entities. Widening only ever adds
   obligations, so it cannot cause unsafe narrowing.
+- **Directory scope.** A V2 path ending in `/` is a declared scope and cannot pin a blob. As a
+  subject it is evaluated once per path obligation it holds, checking the subject side as that
+  held path, so every held path must be tracked, fresh, and clean on its own. A scope that holds a
+  changed path also widens (`EEP-V2-012`, `EEP-V2-013`). Nothing without a trailing `/` is a scope.
 
 ## Alternatives weighed
 
@@ -31,13 +35,16 @@ record shape: the schema value is the only opt-in, and a V1 record's path relati
 - *A new top-level result list for selection*: rejected because the path rows reuse
   `selected`/`candidates`, marked by `subject` instead of `entity`, so existing consumers read
   them without a new member.
-- *Qualify descendants of a changed path*: this needs a declared qualification rule, so it is left
-  to a follow-up. Only the exact path qualifies.
+- *Treat any path as a prefix of its descendants*: rejected because `pkg` would then cover `pkgs/`
+  and a file path would silently turn into a directory. The trailing `/` is the declaration.
+- *Verify the directory once and cover every file beneath it*: rejected because a directory is not
+  a Git blob, checkout trees answer only for named paths, and one stale or dirty file must still
+  block. Each held path is verified on its own instead.
 
 ## Rollback
 
 Remove `Schema2` and the path functions in `internal/extevidence` (`pathRelationsOf`,
-`addPathRelations`, `pathTest`, `widenPaths`, `pathRow`), the `conformance-path` fixture and path
+`addPathRelations`, `pathTest`, `scopeTest`, `checkScope2`, `widenPaths`, `pathRow`), the `conformance-path` fixture and path
 tests, the help lines, the V2 spec with its index rows, and this record, and revert the
-`EEP-V1-001` and `EEP-V1-010` wording. V0 and V1 records and runs without `--provider` are
+`EEP-V1-001`, `EEP-V1-010`, and V1 non-goal wording. V0 and V1 records and runs without `--provider` are
 unaffected in both directions.

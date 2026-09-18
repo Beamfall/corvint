@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -131,6 +132,23 @@ func validate1(record Record1) error {
 	for position, relation := range record.Relations {
 		if err := validateRelation1(position, relation); err != nil {
 			return err
+		}
+		if err := checkScope2(record.Schema, position, relation); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkScope2 refuses a pinned blob on a V2 directory scope: a path ending in
+// "/" names a tree, never one blob (EEP-V2-012). V1 keeps its rules.
+func checkScope2(schema string, position int, relation Relation1) error {
+	if schema != Schema2 {
+		return nil
+	}
+	for field, side := range []Endpoint1{relation.From, relation.To} {
+		if strings.HasSuffix(side.Path, "/") && side.Blob != "" {
+			return fmt.Errorf("relations[%d].%s: a directory scope must not pin a blob", position, []string{"from", "to"}[field])
 		}
 	}
 	return nil

@@ -13,9 +13,6 @@ Future features and larger directions. Promote to `docs/specs/` when an idea mat
 One paragraph: what, where (file:line), why it matters, and what done looks like.
 -->
 
-### 2026-09-18 extevidence: qualify a path relation whose subject is a descendant of a changed path (EEP-V2 follow-up)
-`EEP-V2-006` qualifies a path relation only when an endpoint is exactly a changed or widened path. A relation naming `pkg/` for a change to `pkg/main.go`, or a file under a changed directory, leaves the obligation uncovered. Done means a declared qualification rule for descendants, with conformance cases showing it never narrows a change the relation does not cover.
-
 ### 2026-09-18 extevidence: test selection beyond one hop and into checkout worktrees (ETS-V0 follow-up)
 `docs/specs/external-test-selection-v0.md` stops obligations one relation hop downstream of a changed entity, and never reads a bound checkout's worktree (rows say `checkout-worktree-not-inspected`). Both keep the selection fail-closed only as far as the record is complete. Done means a bounded transitive obligation walk and a per-checkout dirty read, each with conformance cases proving they only ever widen.
 
