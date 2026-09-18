@@ -242,7 +242,7 @@ supplies them, and how?
 *Cost evidence, not authority:* a `stop` event admits exactly `{stopHookActive, changedPaths}` plus
 session binding (`internal/gokernel/harness.go:186-187`); the frontier surface requires
 `--cem MAP --ocm MAP --expected-base REV --target REV`, with base and target "never inferred"
-(`cmd/corvint/help.go:458-465`); and `AHI-014` restricts wrappers to "the minimum event fields
+(`cmd/corvint/help.go:463-470`); and `AHI-014` restricts wrappers to "the minimum event fields
 admitted by `corvint-harness-event/0`" (`agent-harness-integration-v0.md:140-142`).
 
 One option that looks available is not: the harness cannot recover the session's own start revision,

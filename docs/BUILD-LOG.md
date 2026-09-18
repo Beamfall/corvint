@@ -7,6 +7,14 @@ decision IDs it concerns, so `rg -n '^## ' docs/BUILD-LOG.md` is the index.
 The public tree starts this log at the 0.4.0a4 alpha. Entries written before publication are internal
 working records and are referenced from decisions and specifications as historical context only.
 
+## 2026-09-18 EFO-V0 external obligations sidecar: reference-only join to the frontier
+
+Decision 0313. `corvint obligations --cem FILE --impact FILE` writes `external-frontier-obligations/0`
+(`docs/specs/external-frontier-obligations-v0.md`). The CEM and frontier wires are unchanged; the
+sidecar cites the frontier through `binding.cem_sha256` (the `CF-V0-019` raw-copy digest) and CEM hunk
+ids, and nothing reads it. Tested by `TestObligations*` in `internal/extevidence` and `cmd/corvint`;
+no adopter receipt or labelled review sample exists yet, so promotion stays open.
+
 ## 2026-09-18 EEP-V2 path-to-path relations: synthetic conformance evaluation
 
 Decision 0312. `TestSelectionEvaluation` now runs over both labelled corpora: the 23 ETS-V0 cases,
