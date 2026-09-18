@@ -175,7 +175,7 @@ touched, and that member is absent for every existing caller.
 | `EEP-V0-008` | `internal/extevidence/compose.go` | `TestRelationTypesPreserved` |
 | `EEP-V0-009` | `internal/extevidence/freshness.go` | `TestFreshnessStatesFromAncestry` |
 | `EEP-V0-010` | `internal/extevidence/compose.go` | `TestReferenceVerificationStates` |
-| `EEP-V0-011` | `internal/extevidence/compose.go` | `TestResultCompositionDirectDownstreamVerification`, `TestImpactProviderEvaluation` |
+| `EEP-V0-011` | `internal/extevidence/compose.go` | `TestResultCompositionDirectDownstreamVerification`, `TestItemOrderGroupsByProvider` (provider-id ordering corrected 2026-09-18; section bytes change only for runs where two providers declare the same entity id), `TestImpactProviderEvaluation` |
 | `EEP-V0-012` | `internal/extevidence/compose.go` | `TestLimitsAndOmissions` |
 | `EEP-V0-014` | `cmd/corvint/main.go` | `TestImpactProviderReadOnly` |
 

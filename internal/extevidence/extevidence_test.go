@@ -460,6 +460,23 @@ func TestResultCompositionDirectDownstreamVerification(t *testing.T) {
 	}
 }
 
+// EEP-V0-011: two providers declaring the same entity id group by provider, not by relation.
+func TestItemOrderGroupsByProvider(t *testing.T) {
+	t.Parallel()
+	at := func(provider, entity, relationType string) item {
+		return item{provider: provider, entity: Entity{ID: entity}, link: link{relation: Relation{From: "path:pkg/main.go", To: entity, Type: relationType}}}
+	}
+	items := []item{at("b", "cap-x", "covers"), at("a", "cap-y", "covers"), at("a", "cap-x", "implements")}
+	sortItems(items)
+	var got []string
+	for _, entry := range items {
+		got = append(got, entry.provider+"/"+entry.entity.ID)
+	}
+	if strings.Join(got, " ") != "a/cap-x a/cap-y b/cap-x" {
+		t.Fatalf("order = %v", got)
+	}
+}
+
 func TestLimitsAndOmissions(t *testing.T) {
 	t.Parallel()
 	repo := newRepository(t)

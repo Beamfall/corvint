@@ -356,6 +356,9 @@ func entitySet(items []item) map[string]struct{} {
 
 func sortItems(items []item) {
 	sort.Slice(items, func(i, j int) bool {
+		if items[i].provider != items[j].provider {
+			return items[i].provider < items[j].provider
+		}
 		if items[i].entity.ID != items[j].entity.ID {
 			return items[i].entity.ID < items[j].entity.ID
 		}
