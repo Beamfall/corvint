@@ -19,6 +19,7 @@ import (
 
 	cemcli "github.com/Beamfall/corvint/internal/cem/cli"
 	"github.com/Beamfall/corvint/internal/contextindex"
+	"github.com/Beamfall/corvint/internal/extevidence"
 	"github.com/Beamfall/corvint/internal/gokernel"
 	"github.com/Beamfall/corvint/internal/observations"
 	"github.com/Beamfall/corvint/internal/worktreeimpact"
@@ -31,36 +32,37 @@ const maximumImpactLimit = 50
 const defaultHarnessBudgetBytes = 8_000
 
 type options struct {
-	command        string
-	helpTopic      string
-	proveMode      string
-	proveMutate    bool
-	prove          proveOptions
-	root           string
-	host           string
-	hostVersion    string
-	surface        string
-	adapterVersion string
-	event          string
-	input          string
-	budgetBytes    int
-	impactPaths    []string
-	impactRawPaths []string
-	impactLimit    int
-	impactWorktree bool
-	impactBase     string
-	impactBaseSet  bool
-	impactProfile  string
-	featureID      string
-	featureIDSet   bool
-	featureLimit   int
-	featureBudget  *int
-	queryTask      string
-	queryLimit     int
-	queryTaskSet   bool
-	queryBudget    *int
-	queryIntent    string
-	version        bool
+	command         string
+	helpTopic       string
+	proveMode       string
+	proveMutate     bool
+	prove           proveOptions
+	root            string
+	host            string
+	hostVersion     string
+	surface         string
+	adapterVersion  string
+	event           string
+	input           string
+	budgetBytes     int
+	impactPaths     []string
+	impactRawPaths  []string
+	impactProviders []string
+	impactLimit     int
+	impactWorktree  bool
+	impactBase      string
+	impactBaseSet   bool
+	impactProfile   string
+	featureID       string
+	featureIDSet    bool
+	featureLimit    int
+	featureBudget   *int
+	queryTask       string
+	queryLimit      int
+	queryTaskSet    bool
+	queryBudget     *int
+	queryIntent     string
+	version         bool
 }
 
 type readResult struct {
@@ -365,6 +367,25 @@ func parseImpactArgumentsForPlatform(result options, arguments []string, platfor
 			result.impactLimit = limit
 			continue
 		}
+		if !positionalOnly && name == "--provider" {
+			if !inline {
+				if index+1 >= len(arguments) || argparseOptionLike(arguments[index+1]) {
+					return result, argumentError("argument --provider: expected one argument")
+				}
+				value = arguments[index+1]
+				index += 2
+			} else {
+				index++
+			}
+			if value == "" {
+				return result, argumentError("argument --provider: expected one argument")
+			}
+			if len(result.impactProviders) == extevidence.MaxProviders {
+				return result, argumentError(fmt.Sprintf("argument --provider: at most %d providers", extevidence.MaxProviders))
+			}
+			result.impactProviders = append(result.impactProviders, value)
+			continue
+		}
 		if !positionalOnly && strings.HasPrefix(argument, "-") {
 			return result, argumentError("unrecognized arguments: " + argument)
 		}
@@ -378,6 +399,9 @@ func parseImpactArgumentsForPlatform(result options, arguments []string, platfor
 		result.impactPaths = append(result.impactPaths, normalized)
 		result.impactRawPaths = append(result.impactRawPaths, argument)
 		index++
+	}
+	if len(result.impactProviders) != 0 && (result.impactBaseSet || result.impactWorktree) {
+		return result, argumentError("--provider is available only for the default path profile, not --base or --working-tree-untracked")
 	}
 	if result.impactBaseSet {
 		if result.impactWorktree || len(result.impactPaths) != 0 {
@@ -1019,7 +1043,14 @@ func runContext(ctx context.Context, arguments []string, stdin io.Reader, stdout
 			if options.impactBaseSet {
 				return contextindex.RangeImpact(ctx, index, options.impactBase, options.impactLimit)
 			}
-			return standaloneImpactContext(index, options.impactPaths, options.impactLimit)
+			contextReceipt, err := standaloneImpactContext(index, options.impactPaths, options.impactLimit)
+			if err != nil || len(options.impactProviders) == 0 {
+				return contextReceipt, err
+			}
+			// EEP-V0-003: provider output lives only under `external`; every
+			// other member is exactly what the run without --provider produced.
+			contextReceipt["external"] = extevidence.Section(ctx, index, options.impactProviders, options.impactPaths, options.impactLimit)
+			return contextReceipt, nil
 		}
 		// Path impact and feature read the snapshot on the terms of
 		// IDX-SNAP-V0-019. The working-tree and range profiles read Source.Data

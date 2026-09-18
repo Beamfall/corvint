@@ -801,7 +801,7 @@ Recovery for unsupported-query-trace-state:
 const impactHelp = `Compile experimental impact evidence for index-admitted paths.
 
 Usage:
-  corvint [--root PATH] impact [--limit N] PATH...
+  corvint [--root PATH] impact [--limit N] [--provider FILE]... PATH...
   corvint [--root PATH] impact --working-tree-untracked [--limit N] PATH...
   corvint [--root PATH] impact --base FULL_COMMIT_ID [--limit N]
     [--range-profile expanded-256]
@@ -827,6 +827,12 @@ Options:
                              Explicit experimental range capacity of 256 paths;
                              requires --base. All other range bounds and omissions
                              remain unchanged. The default range capacity is 100.
+  --provider FILE            Experimental (EEP-V0): attach one external evidence
+                             provider record (schema external-evidence-provider/0)
+                             to the receipt's separate "external" section. Repeat
+                             up to 4 times; a relative FILE resolves against --root;
+                             default path profile only. Provider items carry
+                             authority "external-provider" and never enter results.
   --                         Treat all remaining arguments as paths.
 
 Requirements:
