@@ -153,6 +153,7 @@ the exit code, so an existing caller that never passes `--provider` observes no 
 | Path tracked with equal, differing, and absent pinned blob; untracked path | `verified`, `stale`, `verified`, `missing` |
 | More entities than `--limit` | `omitted.results` counts the rest |
 | Same inputs twice | identical section bytes |
+| Evaluation over the mock-provider fixture | precision, recall, false-positive relationships 0, abstention accuracy, latency, receipt bytes |
 
 ## Rollout, rollback, and compatibility
 
@@ -170,11 +171,11 @@ touched, and that member is absent for every existing caller.
 | `EEP-V0-004` | `internal/extevidence/section.go` | `TestProviderSectionDeterministicAndPinned` |
 | `EEP-V0-005` | `internal/extevidence/section.go` | `TestProviderUnavailableAndInvalidAreStructured` |
 | `EEP-V0-006` | `internal/extevidence/compose.go` | `TestEndpointIdentitiesResolve` |
-| `EEP-V0-007` | `internal/extevidence/compose.go` | `TestEvidenceKindLearnedExcluded` |
+| `EEP-V0-007` | `internal/extevidence/compose.go` | `TestEvidenceKindLearnedExcluded`, `TestImpactProviderEvaluation` |
 | `EEP-V0-008` | `internal/extevidence/compose.go` | `TestRelationTypesPreserved` |
 | `EEP-V0-009` | `internal/extevidence/freshness.go` | `TestFreshnessStatesFromAncestry` |
 | `EEP-V0-010` | `internal/extevidence/compose.go` | `TestReferenceVerificationStates` |
-| `EEP-V0-011` | `internal/extevidence/compose.go` | `TestResultCompositionDirectDownstreamVerification` |
+| `EEP-V0-011` | `internal/extevidence/compose.go` | `TestResultCompositionDirectDownstreamVerification`, `TestImpactProviderEvaluation` |
 | `EEP-V0-012` | `internal/extevidence/compose.go` | `TestLimitsAndOmissions` |
 | `EEP-V0-014` | `cmd/corvint/main.go` | `TestImpactProviderReadOnly` |
 

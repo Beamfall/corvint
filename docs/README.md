@@ -13,6 +13,8 @@ guidance from historical records.
   format and integration.
 - [MCP server](MCP-SERVER.md), [integration ecosystem](EXTENSION-ECOSYSTEM.md), and
   [Beamfall integration](BEAMFALL-INTEGRATION.md) — integration contracts and current limits.
+- [External evidence providers](EXTERNAL-EVIDENCE-PROVIDERS.md) — the provider record format,
+  `context.external`, authority, and privacy boundary for a third-party evidence source.
 - [Architecture](ARCHITECTURE.md), [development contract](SPEC-DRIVEN-DEVELOPMENT.md), and
   [dogfood contract](DOGFOOD.md) — contributor guidance.
 - [Release notes](RELEASE-NOTES.md) and [public-alpha detail](RELEASE-NOTES-alpha.md) — current

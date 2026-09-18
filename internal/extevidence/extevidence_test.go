@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Beamfall/corvint/internal/contextindex"
 )
@@ -264,6 +265,93 @@ func TestEvidenceKindLearnedExcluded(t *testing.T) {
 		if entry.toMap()["authority"] != Authority {
 			t.Fatalf("Core must assign authority %q", Authority)
 		}
+	}
+}
+
+// TestImpactProviderEvaluation reports precision, recall, false-positive
+// relationships, abstention accuracy, latency, and receipt size for the
+// provider-to-impact workflow (`context.external`, EEP-V0-011) over the
+// mock-provider fixture's five labelled relations: a `declared` path-to-entity
+// relation and its `inferred` downstream neighbor and `observed` verification
+// must all be admitted; the `learned` relation (EEP-V0-007) and the
+// foreign-provider endpoint (EEP-V0-006) must both be excluded to `unknowns`.
+// This is a synthetic single-record fixture, not an adopter corpus.
+func TestImpactProviderEvaluation(t *testing.T) {
+	t.Parallel()
+	repo := newRepository(t)
+	source := writeRecord(t, t.TempDir(), "mock.json", fixture(t, repo.head))
+	// The fixture carries exactly 3 relations that must be admitted (declared
+	// implements, inferred enables, observed verifies) and 2 that must be
+	// excluded (learned, foreign-provider); see the fixture at
+	// testdata/mock-provider.json.
+	const relevantRelations = 3
+	admitted := map[string]bool{"mockdocs:cap-stable-value": true, "mockdocs:journey-first-run": true}
+	forbidden := []string{"mockdocs:gap-no-negative-test", "cap-1"}
+
+	started := time.Now()
+	out, err := contextindex.CanonicalJSON(Section(context.Background(), repo.index(), []string{source}, nil, []string{"pkg/main.go"}, 10))
+	latency := time.Since(started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var section map[string]any
+	if err := json.Unmarshal(out, &section); err != nil {
+		t.Fatal(err)
+	}
+
+	var admittedCount, truePositive, falsePositive, learnedAdmitted int
+	for _, list := range []string{"results", "downstream", "verification"} {
+		for _, raw := range section[list].([]any) {
+			row := raw.(map[string]any)
+			admittedCount++
+			entity, _ := row["entity"].(string)
+			if admitted[entity] {
+				truePositive++
+			} else {
+				falsePositive++
+			}
+			for _, id := range forbidden {
+				if strings.Contains(entity, id) {
+					falsePositive++
+				}
+			}
+			if relation, ok := row["relation"].(map[string]any); ok && relation["evidence"] == "learned" {
+				learnedAdmitted++
+			}
+		}
+	}
+	recall := float64(truePositive) / float64(relevantRelations)
+	precision := float64(truePositive) / float64(max(admittedCount, 1))
+
+	var excludedLearned, excludedForeign bool
+	for _, raw := range section["unknowns"].([]any) {
+		row := raw.(map[string]any)
+		relation, _ := row["relation"].(map[string]any)
+		if relation["evidence"] == "learned" && row["state"] == "excluded" {
+			excludedLearned = true
+		}
+		if relation["evidence"] == "declared" && row["state"] == "unresolved" {
+			excludedForeign = true
+		}
+	}
+	abstainCorrect := 0
+	if excludedLearned {
+		abstainCorrect++
+	}
+	if excludedForeign {
+		abstainCorrect++
+	}
+
+	t.Logf("relations=%d precision=%.3f (%d/%d) recall=%.3f (%d/%d) false-positive-relations=%d abstention-accuracy=%d/2 latency=%s receipt-bytes=%d",
+		relevantRelations+2, precision, truePositive, admittedCount, recall, truePositive, relevantRelations, falsePositive, abstainCorrect, latency, len(out))
+	if falsePositive != 0 {
+		t.Fatalf("zero false-positive relationships required, got %d", falsePositive)
+	}
+	if learnedAdmitted != 0 {
+		t.Fatalf("zero learned-evidence admission required, got %d", learnedAdmitted)
+	}
+	if abstainCorrect != 2 {
+		t.Fatalf("both the learned and foreign-provider relations must be reported as unknowns, got %d/2", abstainCorrect)
 	}
 }
 
