@@ -1,5 +1,5 @@
 {
-  "baseRevision": "ea24cd0ea2cf950e195aae7a4a4cea559b930a86",
+  "baseRevision": "4314384f3e9a09e9fab7e32b80f09ed11ccb11b0",
   "evidence": [
     {
       "blobOid": "55565955d912737d89517692f6fe6283b81c91f3",
@@ -22,8 +22,8 @@
       "spanSha256": "7fd8432dad7e26e330f5fb689dbe4ee2c2315faac3f26d902c21065041280680"
     },
     {
-      "blobOid": "0cdbf896e33f48d529b30b5568e1d6d80377922b",
-      "id": "evidence:sha256:edaa2dbf2c74fb68ceb6ba11ccc68ad5c2bf3152828e5780888bf5c002a732b1",
+      "blobOid": "48216b5cd65175e182f08541fd7ac2bcc517e201",
+      "id": "evidence:sha256:7f26b186edb359d1591b0af78cdcf79d9cc55420cb3a7d1c6cfbfdeaf4185eed",
       "path": "docs/specs/falsifiable-packet-v0.md",
       "span": {
         "end": 11045,
@@ -167,7 +167,7 @@
     {
       "basis": [
         {
-          "evidenceId": "evidence:sha256:edaa2dbf2c74fb68ceb6ba11ccc68ad5c2bf3152828e5780888bf5c002a732b1",
+          "evidenceId": "evidence:sha256:7f26b186edb359d1591b0af78cdcf79d9cc55420cb3a7d1c6cfbfdeaf4185eed",
           "relation": "specification"
         }
       ],
