@@ -39,12 +39,7 @@ type provider struct {
 // the impact receipt. It never fails: every problem is a structured entry.
 // checkouts bind V1 repositories to local directories (EEP-V1-003).
 func Section(ctx context.Context, index *contextindex.Index, sources []string, checkouts []Checkout, changedPaths []string, limit int) map[string]any {
-	providers := make([]provider, 0, len(sources))
-	for _, source := range sources {
-		providers = append(providers, load(ctx, index, source))
-	}
-	repository := repositoryTree(ctx, index, providers)
-	bound := bindV1(ctx, index, providers, checkouts)
+	providers, repository, bound := loadAll(ctx, indexRoot(index), sources, checkouts)
 	changed := make(map[string]struct{}, len(changedPaths))
 	for _, path := range changedPaths {
 		changed[path] = struct{}{}
@@ -67,9 +62,44 @@ func Section(ctx context.Context, index *contextindex.Index, sources []string, c
 	return section
 }
 
+// rootRepository is the repository the changed paths belong to: its
+// directory, the commit records are judged against, and how to answer tracked
+// and blob questions there. impact reads it from the index, affected from HEAD.
+// A HEAD tree knows only the paths it was asked about, so every V0 path
+// endpoint is requested (allPaths), not only the pinned ones.
+type rootRepository struct {
+	dir, revision string
+	allPaths      bool
+	tree          func(ctx context.Context, paths []string) tree
+}
+
+func indexRoot(index *contextindex.Index) rootRepository {
+	return rootRepository{dir: index.Root, revision: index.CommitRevision, tree: func(ctx context.Context, paths []string) tree {
+		return rootTree(ctx, index, paths)
+	}}
+}
+
+// headRoot answers at a commit without an index: a path is tracked when it
+// names a blob there, exactly as for a bound checkout.
+func headRoot(dir, revision string) rootRepository {
+	return rootRepository{dir: dir, revision: revision, allPaths: true, tree: func(ctx context.Context, paths []string) tree {
+		return checkoutTree(ctx, checkout{dir: dir, head: revision}, paths)
+	}}
+}
+
+// loadAll decodes every source and binds every V1 record once.
+func loadAll(ctx context.Context, root rootRepository, sources []string, checkouts []Checkout) ([]provider, tree, *bindings) {
+	providers := make([]provider, 0, len(sources))
+	for _, source := range sources {
+		providers = append(providers, load(ctx, root, source))
+	}
+	repository := repositoryTree(ctx, root, providers)
+	return providers, repository, bindV1(ctx, root, providers, checkouts)
+}
+
 // bindV1 resolves bindings only when a V1 record loaded or a checkout was
 // named, so a V0-only run makes no additional Git call.
-func bindV1(ctx context.Context, index *contextindex.Index, providers []provider, checkouts []Checkout) *bindings {
+func bindV1(ctx context.Context, root rootRepository, providers []provider, checkouts []Checkout) *bindings {
 	needed := len(checkouts) != 0
 	for _, entry := range providers {
 		needed = needed || entry.record1 != nil
@@ -77,10 +107,10 @@ func bindV1(ctx context.Context, index *contextindex.Index, providers []provider
 	if !needed {
 		return nil
 	}
-	bound := resolveBindings(ctx, index, checkouts)
+	bound := resolveBindings(ctx, root, checkouts)
 	for position := range providers {
 		if providers[position].record1 != nil {
-			providers[position].view = view1(ctx, index, *providers[position].record1, bound)
+			providers[position].view = view1(ctx, root, *providers[position].record1, bound)
 		}
 	}
 	return bound
@@ -108,11 +138,11 @@ func checkoutUse(providers []provider) map[string]int {
 	return used
 }
 
-func load(ctx context.Context, index *contextindex.Index, source string) provider {
+func load(ctx context.Context, root rootRepository, source string) provider {
 	entry := provider{source: source, state: StateUnavailable}
 	resolved := source
 	if !filepath.IsAbs(resolved) {
-		resolved = filepath.Join(index.Root, filepath.FromSlash(source))
+		resolved = filepath.Join(root.dir, filepath.FromSlash(source))
 	}
 	info, err := os.Stat(resolved)
 	if err != nil {
@@ -146,8 +176,8 @@ func load(ctx context.Context, index *contextindex.Index, source string) provide
 		return entry
 	}
 	entry.record, entry.state = record, StateLoaded
-	entry.freshness = Freshness(ctx, index.Root, index.CommitRevision, record.Repository.Revision)
-	entry.reason = "record decoded; freshness by Git ancestry against " + index.CommitRevision
+	entry.freshness = Freshness(ctx, root.dir, root.revision, record.Repository.Revision)
+	entry.reason = "record decoded; freshness by Git ancestry against " + root.revision
 	return entry
 }
 
@@ -174,7 +204,7 @@ func describe(err error) string {
 
 // repositoryTree answers tracked and blob questions for every pinned path the
 // loaded records name, resolving blobs the index did not read in one Git call.
-func repositoryTree(ctx context.Context, index *contextindex.Index, providers []provider) tree {
+func repositoryTree(ctx context.Context, root rootRepository, providers []provider) tree {
 	var pinned []string
 	for _, entry := range providers {
 		if entry.state != StateLoaded {
@@ -183,14 +213,14 @@ func repositoryTree(ctx context.Context, index *contextindex.Index, providers []
 		for _, relation := range entry.record.Relations {
 			for _, raw := range []string{relation.From, relation.To} {
 				path, isPath := strings.CutPrefix(raw, "path:")
-				if !isPath || relation.Blob == "" || checkPath(path) != "" {
+				if !isPath || (relation.Blob == "" && !root.allPaths) || checkPath(path) != "" {
 					continue
 				}
 				pinned = append(pinned, path)
 			}
 		}
 	}
-	return rootTree(ctx, index, pinned)
+	return root.tree(ctx, pinned)
 }
 
 func batchBlobs(ctx context.Context, root, revision string, paths []string) map[string]string {
@@ -217,19 +247,7 @@ func batchBlobs(ctx context.Context, root, revision string, paths []string) map[
 }
 
 func assemble(providers []provider, merged composition, limit int) map[string]any {
-	rows := make([]any, 0, len(providers))
-	for _, entry := range providers {
-		if entry.view != nil {
-			rows = append(rows, entry.row1())
-			continue
-		}
-		rows = append(rows, map[string]any{
-			"source": entry.source, "sha256": entry.sha256, "state": entry.state, "reason": entry.reason,
-			"id": entry.record.Provider.ID, "revision": entry.record.Provider.Revision,
-			"repository_revision": entry.record.Repository.Revision, "freshness": entry.freshness,
-			"entities": len(entry.record.Entities), "relations": len(entry.record.Relations),
-		})
-	}
+	rows := providerRows(providers)
 	sortItems(merged.results)
 	sortItems(merged.downstream)
 	sortItems(merged.verification)
@@ -261,6 +279,24 @@ func assemble(providers []provider, merged composition, limit int) map[string]an
 		"omitted":               map[string]any{"results": omittedResults, "downstream": omittedDownstream, "verification": omittedVerification, "unknowns": max(len(merged.unknowns)-limit, 0)},
 		"untrusted_text_fields": fields,
 	}
+}
+
+// providerRows reports every selected record, loaded or not (EEP-V0-005).
+func providerRows(providers []provider) []any {
+	rows := make([]any, 0, len(providers))
+	for _, entry := range providers {
+		if entry.view != nil {
+			rows = append(rows, entry.row1())
+			continue
+		}
+		rows = append(rows, map[string]any{
+			"source": entry.source, "sha256": entry.sha256, "state": entry.state, "reason": entry.reason,
+			"id": entry.record.Provider.ID, "revision": entry.record.Provider.Revision,
+			"repository_revision": entry.record.Repository.Revision, "freshness": entry.freshness,
+			"entities": len(entry.record.Entities), "relations": len(entry.record.Relations),
+		})
+	}
+	return rows
 }
 
 // row1 is a loaded V1 provider row: freshness is per repository, never one

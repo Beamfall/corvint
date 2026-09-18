@@ -656,6 +656,24 @@
     ]
   },
   {
+    "path": "docs/specs/external-test-selection-v0.md",
+    "title": "External Test Selection V0 — fail-closed advice from verification relations",
+    "reqPrefix": "ETS-V0",
+    "intent": "accepted (decision 0311)",
+    "delivery": "experimental (file transport only)",
+    "claim": "`corvint affected --provider FILE` adds `advice.test_selection`: fail-closed advice on whether external verification relations allow a narrower test run.",
+    "dependsOn": [
+      "docs/specs/affected-plan-v0.md",
+      "docs/specs/external-evidence-provider-v1.md"
+    ],
+    "supersededBy": null,
+    "closableToday": false,
+    "implementation": [
+      "cmd/corvint",
+      "internal/extevidence"
+    ]
+  },
+  {
     "path": "docs/specs/experimental-source-views-v0.md",
     "title": "Experimental caller-selected source views V0",
     "reqPrefix": "ESV-V0",

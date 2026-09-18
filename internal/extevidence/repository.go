@@ -68,14 +68,14 @@ type bindings struct {
 	order     []Checkout
 }
 
-func resolveBindings(ctx context.Context, index *contextindex.Index, checkouts []Checkout) *bindings {
+func resolveBindings(ctx context.Context, root rootRepository, checkouts []Checkout) *bindings {
 	out := &bindings{
-		root:      checkout{dir: index.Root, head: index.CommitRevision, state: "resolved", roots: rootCommits(ctx, index.Root, index.CommitRevision)},
+		root:      checkout{dir: root.dir, head: root.revision, state: "resolved", roots: rootCommits(ctx, root.dir, root.revision)},
 		checkouts: make(map[string]checkout, len(checkouts)),
 		order:     checkouts,
 	}
 	for _, entry := range checkouts {
-		out.checkouts[entry.ID] = resolveCheckout(ctx, index.Root, entry.Source)
+		out.checkouts[entry.ID] = resolveCheckout(ctx, root.dir, entry.Source)
 	}
 	return out
 }
@@ -225,7 +225,7 @@ func freshnessOf(ctx context.Context, state *repositoryState, bound *bindings) s
 }
 
 // view1 resolves one V1 record against its repository states and trees.
-func view1(ctx context.Context, index *contextindex.Index, record Record1, bound *bindings) *view {
+func view1(ctx context.Context, root rootRepository, record Record1, bound *bindings) *view {
 	states, primary := repositoryStates(ctx, record, bound)
 	v := &view{provider: record.Provider.ID, entities: entityMap(record.Entities), primary: primary, repositories: states, trees: map[string]tree{}}
 	for position := range record.Relations {
@@ -247,7 +247,7 @@ func view1(ctx context.Context, index *contextindex.Index, record Record1, bound
 	for id, state := range states {
 		switch state.binding {
 		case BindingRoot:
-			v.trees[id] = rootTree(ctx, index, pinned[id])
+			v.trees[id] = root.tree(ctx, pinned[id])
 		case BindingCheckout:
 			v.trees[id] = checkoutTree(ctx, bound.checkouts[id], pinned[id])
 		}
