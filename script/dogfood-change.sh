@@ -129,7 +129,7 @@ resolve_corvint_bin() {
   return_code=$?
   child_pid=
   version_output=$(cat "$run_tmp/corvint-version.stdout")
-  if [[ $return_code -ne 0 || $version_output != "Corvint $expected_version" ]]; then
+  if [[ $return_code -ne 0 || ! $version_output =~ ^"Corvint $expected_version (build "(0|[1-9][0-9]*)")"$ ]]; then
     printf 'dogfood-change: REFUSE corvint-version-mismatch expected=%s\n' "$expected_version" >&2
     exit 2
   fi

@@ -18,10 +18,12 @@ import "os"
 
 var marks string
 
+var build = "0"
+
 func main() {
 	switch {
 	case len(os.Args) > 1 && os.Args[1] == "--version":
-		os.Stdout.WriteString("Fixture 1\n")
+		os.Stdout.WriteString("Fixture 1 (build " + build + ")\n")
 	case len(os.Args) > 3 && os.Args[3] == "query":
 		os.Stdout.WriteString("{\"context\":{\"intent\":{\"id\":\"fixture\"}}}\n")
 	default:

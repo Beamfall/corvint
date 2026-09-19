@@ -43,6 +43,8 @@ type Report struct {
 	Pending      []string         `json:"pendingEvidence"`
 	Verdict      string           `json:"verdict"`
 	Reasons      []Reason         `json:"reasons"`
+	// build is the build number stamped into every target (PUB-V0-021).
+	build string
 }
 
 type ToolchainReport struct {

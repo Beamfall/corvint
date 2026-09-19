@@ -128,7 +128,7 @@ identical inputs and effective policy, and requires byte-identical stdout, stder
 Disagreement fails `verifier-disagreement`. The report records both binary SHA-256 digests and the
 agreement result. Both verifiers build with `-trimpath`, so a digest depends on the source and
 toolchain rather than on the private extraction directory. An explicit `CORVINT_BIN` override is accepted only when its `--version` output
-exactly matches `VERSION`; during final checking it is an additional verifier that must agree
+is `Corvint VERSION (build N)` with `VERSION` matched exactly (decision 0314); during final checking it is an additional verifier that must agree
 and whose digest is also recorded.
 
 Because `.corvint/change.cem.json` is one tracked path and each change's base is the commit before

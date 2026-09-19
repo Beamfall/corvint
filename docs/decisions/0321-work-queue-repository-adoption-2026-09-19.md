@@ -1,4 +1,4 @@
-# Decision 0314 — A repository adopts the work queue through `corvint work init`
+# Decision 0321 — A repository adopts the work queue through `corvint work init`
 
 Date: 2026-09-19. Status: accepted (delegated call on the owner's own feature request
 Beamfall/corvint#20; owner review of the intent is welcome and changes only the digest line).

@@ -7,7 +7,7 @@ decision IDs it concerns, so `rg -n '^## ' docs/BUILD-LOG.md` is the index.
 The public tree starts this log at the 0.4.0a4 alpha. Entries written before publication are internal
 working records and are referenced from decisions and specifications as historical context only.
 
-## 2026-09-19 WQO-V0-046..048 repository work-queue adoption (decision 0314, Beamfall/corvint#20)
+## 2026-09-19 WQO-V0-046..048 repository work-queue adoption (decision 0321, Beamfall/corvint#20)
 
 Before this change, `corvint work observe` could never return `VALIDATED_AT`. `workManifest.complete`
 was never set, so WQO-V0-017 always added `SOURCE_UNQUALIFIED` and `propose-wave` always abstained.

@@ -3,7 +3,7 @@
 **Owner:** Russell Lewis  
 **Date:** 2026-08-23  
 **Intent status:** accepted (decision 0046, 2026-09-04)  
-**Delivery status:** experimental (core library, `corvint work observe` and `propose-wave`, the Corvint self-dogfood adapter, and `conformance/work-queue-v0` landed 2026-09-04; repository adoption through `corvint work init` and `corvint work adapter` landed 2026-09-19 under decision 0314; Beamfall adapter, independent recorder, and the 500 shadow cycles NOT_RUN)  
+**Delivery status:** experimental (core library, `corvint work observe` and `propose-wave`, the Corvint self-dogfood adapter, and `conformance/work-queue-v0` landed 2026-09-04; repository adoption through `corvint work init` and `corvint work adapter` landed 2026-09-19 under decision 0321; Beamfall adapter, independent recorder, and the 500 shadow cycles NOT_RUN)  
 **Rollout class:** shadow-only  
 **Wire profiles:** `work-queue-policy/0`, `work-queue-snapshot/0`,
 `work-queue-detail/0`, `work-queue-checkpoint/0`, `work-queue-observation/0`,
@@ -11,7 +11,7 @@
 
 ## Agent digest
 - Claim: Read-only queue snapshots produce deterministic shadow proposals, derived path clashes, and the largest collision-free wave, authorizing nothing.
-- Status: accepted (decision 0046, 2026-09-04)/experimental (core library, `corvint work observe` and `propose-wave`, the Corvint self-dogfood adapter, and `conformance/work-queue-v0` landed 2026-09-04; repository adoption through `corvint work init` and `corvint work adapter` landed 2026-09-19 under decision 0314; Beamfall adapter, independent recorder, and the 500 shadow cycles NOT_RUN)
+- Status: accepted (decision 0046, 2026-09-04)/experimental (core library, `corvint work observe` and `propose-wave`, the Corvint self-dogfood adapter, and `conformance/work-queue-v0` landed 2026-09-04; repository adoption through `corvint work init` and `corvint work adapter` landed 2026-09-19 under decision 0321; Beamfall adapter, independent recorder, and the 500 shadow cycles NOT_RUN)
 - Exists: a closed read-only observation and deterministic non-operative wave-proposal contract.
 - Blocked on: the Beamfall adapter and the independent recorder; the Corvint-side algorithm, its conformance, and the Corvint self-dogfood adapter are unblocked.
 - Read next: Decision; Authority and trust boundary; §5.6 Corvint-derived collision closure and maximal wave; §5.7 Repository adoption; Traceability and owner inputs.
@@ -542,7 +542,7 @@ work likely to clash on this repository, and what is the most work that can star
   no stdin read; root help and the public command inventory MUST omit it. It is not an alias
   for a WQO command.
 
-### 5.7 Repository adoption (decision 0314)
+### 5.7 Repository adoption (decision 0321)
 
 These requirements let a repository other than Corvint reach a `VALIDATED_AT` observation
 without a new policy vocabulary, store root, or adapter protocol. They change no wire profile.
