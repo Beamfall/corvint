@@ -154,7 +154,7 @@ func TestNativeHookReplacementCanBeInterrupted(t *testing.T) {
 			deadline := time.Now().Add(5 * time.Second)
 			for {
 				raw, err := os.ReadFile(path)
-				if err == nil {
+				if err == nil && len(raw) > 0 {
 					if string(raw) != fmt.Sprint(cmd.Process.Pid) {
 						t.Fatal("replacement changed PID")
 					}

@@ -54,10 +54,17 @@ admitting its digest. Only the exact matching Go binary, platform, OS release, c
 planner and selector can narrow. The artifact pins evidence; it grants no repository authority.
 Do not claim Linux or hosted qualification from the local macOS fixture.
 
-Protected workflow/ruleset status: **NOT_VERIFIED**. The repository workflow and literal pins
-alone do not protect their own control plane. Before enabling any trust pin, the owner must
-configure and review the applicable GitHub required-workflow/ruleset policy so a PR cannot
-replace the trusted workflow or its pins. Keep pins empty until that admission is established.
+Protected workflow/ruleset status: **VERIFIED** (2026-09-19). The repository workflow and literal
+pins alone do not protect their own control plane. Decision 0320 replaces the required-workflow
+policy the free plan lacks: `ci-control-plane.yml` (AFP-V0-016) fails any PR that changes
+`.github/`, and the `main` ruleset requires it, so such a PR merges only by admin bypass. Ruleset
+23699808 is active on the default branch: a pull request with 0 approvals, merge commits only (a
+squash drops the bound change's sha), `require_extra_approval_for_unattributed_changes` false (the
+GitHub default of true blocks a solo repository), required checks `go-product` and
+`ci-control-plane`, and the admin role as the only bypass actor, in pull-request mode. The check
+posted `success` on PR #26 (run 35444060752) and PR #24 (run 35446378936); its `failure` path has
+not yet run on a real PR. Keep pins empty until `pr-tests-qualification.yml` (AFP-V0-017)
+produces a PASS.
 The runtime environment is an allowlist with exact recorded bytes, a fixed absolute Go PATH,
 `/usr/bin/cc`, `GOENV=off`, `LANG=C`, `LC_ALL=C`, `TZ=UTC`, and exclusively owned HOME/TMP/cache
 under `/tmp/corvint-pr-tests-runtime`. An existing runtime path is refused; owned runtime state is

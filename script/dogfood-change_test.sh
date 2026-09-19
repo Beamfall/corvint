@@ -627,6 +627,71 @@ unbound_none=$(cd "$unbound_repo" && script/dogfood-check.sh "$unbound_s1" 2>&1)
 if printf '%s\n' "$unbound_none" | rg -q 'unbound'; then exit 1; fi
 unbound_absent=$(cd "$unbound_repo" && script/dogfood-check.sh "$unbound_b0" 2>&1) || :
 printf '%s\n' "$unbound_absent" | rg -q '^dogfood-check: NOTE unbound-commits NOT_OBSERVED previous-cem-absent$'
+
+# DOGFOOD-013/014: a seal commit is covered by its bind commit, a sealed HEAD is
+# refused, and the newest seal names the previous binding when BASE has no CEM.
+sealed_repo="$test_root/sealed-repo"
+mkdir -p "$sealed_repo/script" "$sealed_repo/.corvint"
+cp "$source_root/script/dogfood-check.sh" "$source_root/script/dogfood-seal.sh" "$sealed_repo/script/"
+sealed_commit() {
+  printf '%s\n' "$1" >> "$sealed_repo/work.txt"
+  git -C "$sealed_repo" -c user.name=t -c user.email=t@example.invalid add -A
+  git -C "$sealed_repo" -c user.name=t -c user.email=t@example.invalid commit -qm "$1"
+  git -C "$sealed_repo" rev-parse HEAD
+}
+git -C "$sealed_repo" init -q -b main
+sealed_b0=$(sealed_commit b0)
+printf '{\n  "baseRevision": "%s",\n  "spec": "cem/0.2"\n}\n' "$sealed_b0" > "$sealed_repo/.corvint/change.cem.json"
+sealed_s1=$(sealed_commit s1)
+mkdir -p "$sealed_repo/.corvint/changes"
+git -C "$sealed_repo" mv .corvint/change.cem.json ".corvint/changes/$sealed_s1.cem.json"
+git -C "$sealed_repo" -c user.name=t -c user.email=t@example.invalid commit -qm seal
+sealed_z1=$(git -C "$sealed_repo" rev-parse HEAD)
+sealed_head_status=0
+sealed_head=$(cd "$sealed_repo" && script/dogfood-check.sh "$sealed_b0" 2>&1) || sealed_head_status=$?
+test "$sealed_head_status" = 2
+printf '%s\n' "$sealed_head" | rg -q '^dogfood-check: REFUSE sealed-head$'
+sealed_c1=$(sealed_commit c1)
+sealed_c2=$(sealed_commit c2)
+sealed_commit c3 >/dev/null
+sealed_gap=$(cd "$sealed_repo" && script/dogfood-check.sh "$sealed_c2" 2>&1) || :
+printf '%s\n' "$sealed_gap" | rg -q "^dogfood-check: NOTE unbound-commits count=2 window=$sealed_b0\\.\\.$sealed_c2\$"
+test "$(printf '%s\n' "$sealed_gap" | rg '^  unbound ')" = "$(printf '  unbound %s\n' "$sealed_c2" "$sealed_c1")"
+sealed_none=$(cd "$sealed_repo" && script/dogfood-check.sh "$sealed_z1" 2>&1) || :
+if printf '%s\n' "$sealed_none" | rg -q 'unbound'; then exit 1; fi
+# A rename of a bound CEM to any other name is not a seal and is not covered.
+printf '{\n  "baseRevision": "%s",\n  "spec": "cem/0.2"\n}\n' "$sealed_c2" > "$sealed_repo/.corvint/change.cem.json"
+sealed_commit s2 >/dev/null
+git -C "$sealed_repo" mv .corvint/change.cem.json .corvint/changes/other.cem.json
+git -C "$sealed_repo" -c user.name=t -c user.email=t@example.invalid commit -qm misnamed
+sealed_c4=$(sealed_commit c4)
+sealed_commit c5 >/dev/null
+sealed_other=$(cd "$sealed_repo" && script/dogfood-check.sh "$sealed_c4" 2>&1) || :
+printf '%s\n' "$sealed_other" | rg -q '^dogfood-check: NOTE unbound-commits NOT_OBSERVED window-cem-base-unavailable$'
+
+# dogfood-seal commits only after the check passes, as one exact rename.
+seal_repo="$test_root/seal-repo"
+mkdir -p "$seal_repo/script" "$seal_repo/.corvint"
+cp "$source_root/script/dogfood-seal.sh" "$seal_repo/script/"
+printf '#!/usr/bin/env bash\nexit "${SEAL_TEST_CHECK_STATUS:-0}"\n' > "$seal_repo/script/dogfood-check.sh"
+chmod +x "$seal_repo/script/dogfood-check.sh"
+git -C "$seal_repo" init -q -b main
+printf '{}\n' > "$seal_repo/.corvint/change.cem.json"
+git -C "$seal_repo" add -A
+git -C "$seal_repo" -c user.name=t -c user.email=t@example.invalid commit -qm bind
+seal_bind=$(git -C "$seal_repo" rev-parse HEAD)
+seal_fail_status=0
+(cd "$seal_repo" && SEAL_TEST_CHECK_STATUS=1 script/dogfood-seal.sh HEAD) || seal_fail_status=$?
+test "$seal_fail_status" = 1
+test "$(git -C "$seal_repo" rev-parse HEAD)" = "$seal_bind"
+seal_output=$(cd "$seal_repo" && GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid \
+  GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid script/dogfood-seal.sh HEAD)
+test "$seal_output" = "dogfood-seal: PASS sealed=.corvint/changes/$seal_bind.cem.json"
+test "$(git -C "$seal_repo" diff-tree -r -M --no-commit-id --name-status HEAD^ HEAD)" = \
+  "R100"$'\t'".corvint/change.cem.json"$'\t'".corvint/changes/$seal_bind.cem.json"
+seal_again_status=0
+(cd "$seal_repo" && script/dogfood-seal.sh HEAD 2>/dev/null) || seal_again_status=$?
+test "$seal_again_status" = 2
 ) &
 phase_jobs="$phase_jobs $!"
 

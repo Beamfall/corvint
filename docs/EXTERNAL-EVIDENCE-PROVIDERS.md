@@ -1,6 +1,6 @@
 # External evidence providers
 
-Status: experimental; file transport only; `context.external` is additive and never changes the
+Status: experimental; file and local command transports; `context.external` is additive and never changes the
 core receipt.
 
 A third-party project can keep evidence that Corvint cannot derive from Git or code alone —
@@ -55,6 +55,17 @@ declared repository to a local checkout, up to eight times, and only alongside `
 (`EEP-V1-009`). `--provider` is incompatible with `--base` and `--working-tree-untracked`, and a
 fifth `--provider` is an argument error. No other verb reads a provider record in this slice except
 `corvint affected`, which reads the same records for test selection (see below).
+
+`corvint impact --provider-command ARGV_JSON PATH...` runs a provider instead of reading a file
+(`docs/specs/external-evidence-provider-transports-v0.md`). `ARGV_JSON` is a JSON array whose first
+element is an absolute executable path, for example `'["/usr/local/bin/export-docs","--json"]'`;
+there is no shell and no `PATH` lookup (`EEP-TR-002`). The command gets empty stdin, only `PATH`,
+`TMPDIR`, `LANG=C`, and `LC_ALL=C` in its environment, and `--root` as its working directory
+(`EEP-TR-003`); it must print one record within 10 seconds and 1 MiB, and its process group is
+killed at the time bound (`EEP-TR-004`). Its stdout is decoded exactly as a record file
+(`EEP-TR-005`); stderr is discarded (`EEP-TR-008`), and any failure is one `unavailable` or
+`invalid` provider row with no record content (`EEP-TR-006`). It counts toward the four-provider
+bound; `corvint affected` does not take it yet.
 
 ## `context.external`
 
@@ -162,9 +173,9 @@ every advice list at 64 rows with omissions counted (`ETS-V0-010`).
 
 ## Not yet supported
 
-- Command, MCP, and remote provider transports. A provider that must be executed rather than read
-  from a file joins later as an Analyzer Capability Contract profile family; the file transport is
-  the baseline (`EEP-V0` Non-goals).
+- MCP and remote provider transports. MCP is a proposed profile (`EEP-TR-009`, decision 0317);
+  wrap an MCP server in a local command that prints one record. A remote fetch is NO-GO on the
+  default local path (`EEP-TR-010`, decision 0318).
 - Obligations more than one relation hop from a changed path; V2 widening stops at the first hop
   (`EEP-V2-008`).
 - Inspecting a `--repository` checkout's worktree contents; a checkout binds identity only, and its

@@ -317,7 +317,11 @@ func compileAffected(ctx context.Context, invocation affectedInvocation) (affect
 	provider := providerGoProjection(graph, plan)
 	advice := compileAffectedAdvice(root, plan, provider)
 	if len(invocation.Providers) != 0 {
-		advice.TestSelection = extevidence.Selection(ctx, root, revision, invocation.Providers, invocation.Checkouts, affectedSelectionInput(invocation, plan, dirty, advice))
+		input := affectedSelectionInput(invocation, plan, dirty, advice)
+		input.CheckoutStatus = func(ctx context.Context, dir string) ([]string, error) {
+			return affected.DirtyPaths(ctx, gitExecutable, dir)
+		}
+		advice.TestSelection = extevidence.Selection(ctx, root, revision, invocation.Providers, invocation.Checkouts, input)
 	}
 	return affectedReceipt{
 		Advice:   advice,

@@ -146,6 +146,9 @@ func checkoutUse(providers []provider) map[string]int {
 }
 
 func load(ctx context.Context, root rootRepository, source string) provider {
+	if argv, isCommand := commandArgv(source); isCommand {
+		return loadCommand(ctx, root, argv)
+	}
 	entry := provider{source: source, state: StateUnavailable}
 	resolved := source
 	if !filepath.IsAbs(resolved) {
@@ -165,6 +168,13 @@ func load(ctx context.Context, root rootRepository, source string) provider {
 		entry.reason = "cannot read record: " + describe(err)
 		return entry
 	}
+	return decodeRecord(ctx, root, entry, data)
+}
+
+// decodeRecord is the one decode every transport shares: the same bytes give
+// the same state, reason, record, and freshness whatever carried them
+// (EEP-TR-005).
+func decodeRecord(ctx context.Context, root rootRepository, entry provider, data []byte) provider {
 	digest := sha256.Sum256(data)
 	entry.sha256 = hex.EncodeToString(digest[:])
 	if schema := declaredSchema(data); schema == Schema1 || schema == Schema2 {

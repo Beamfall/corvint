@@ -154,6 +154,51 @@ func TestAffectedSelectionFailsClosed(t *testing.T) {
 	}
 }
 
+// ETS-V1-005..007: a bound checkout's worktree is read through Git; a clean
+// one keeps the narrow selection and drops the not-inspected limitation, and
+// any dirty path in it widens the selection.
+func TestAffectedSelectionInspectsCheckout(t *testing.T) {
+	t.Parallel()
+	root, base, record := affectedSelectionRepository(t)
+	e2e := t.TempDir()
+	affectedGit(t, e2e, "init", "-q")
+	if err := os.MkdirAll(filepath.Join(e2e, "tests"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(e2e, "tests", "core.spec.ts"), []byte("test('core')\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	affectedGit(t, e2e, "add", ".")
+	affectedGit(t, e2e, "commit", "-qm", "e2e")
+	e2eHead := strings.TrimSpace(affectedGit(t, e2e, "rev-parse", "HEAD"))
+	body, err := os.ReadFile(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = bytes.Replace(body, []byte(`"repositories":[`), []byte(`"repositories":[{"id":"e2e","origin":"`+e2eHead+`","revision":"`+e2eHead+`"},`), 1)
+	body = bytes.Replace(body, []byte(`"relations":[`), []byte(`"relations":[{"from":{"repository":"e2e","path":"tests/core.spec.ts"},"to":{"provider":"mockdocs","entity":"cap-core"},"type":"verifies","evidence":"observed","rule":"e2e-run","reference":"ci/2"},`), 1)
+	if err := os.WriteFile(record, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	receipt, _, stderr, code := runAffectedArguments(t, root, "--base", base, "--provider", record, "--repository", "e2e="+e2e)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	selection := testSelection(t, receipt)
+	if selection["state"] != "narrow-selection-allowed" || bytes.Contains(mustJSON(t, selection["selected"]), []byte("checkout-worktree-not-inspected")) {
+		t.Fatalf("a clean inspected checkout must narrow without the not-inspected limitation: %v %s", selection["state"], mustJSON(t, selection))
+	}
+	appendFile(t, filepath.Join(e2e, "tests", "core.spec.ts"), "// uncommitted\n")
+	receipt, _, stderr, code = runAffectedArguments(t, root, "--base", base, "--provider", record, "--repository", "e2e="+e2e)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	selection = testSelection(t, receipt)
+	if selection["state"] != "full-relevant-suite-required" || !bytes.Contains(mustJSON(t, selection["blocking_reasons"]), []byte("checkout-worktree-dirty")) {
+		t.Fatalf("a dirty checkout must widen: %v %v", selection["state"], selection["blocking_reasons"])
+	}
+}
+
 func mustJSON(t *testing.T, value any) []byte {
 	t.Helper()
 	out, err := json.Marshal(value)

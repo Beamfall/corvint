@@ -443,6 +443,12 @@ validate_citation_plan() {
 }
 
 resolve_anchor
+sealed_in_change=$(git -C "$repo" diff --name-only "$base" "$target" -- .corvint/changes) || exit 2
+if [[ -n $sealed_in_change ]]; then
+  printf 'dogfood-change: REFUSE sealed-cem-in-change\n' >&2
+  printf '  BASE..HEAD adds a sealed CEM; revert or drop the seal commit, then rebind\n' >&2
+  exit 2
+fi
 resolve_corvint_bin
 
 run_corvint prechange-query "$evidence/prechange-query.json" \
