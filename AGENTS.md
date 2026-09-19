@@ -60,7 +60,8 @@ a substitute for independent interoperability or external outcome validation.
 
 At change start run `make dogfood-change BASE=<sha>`. Final binding and checking are post-commit:
 follow `docs/DOGFOOD.md` §4, commit the CEM, then rerun `dogfood-change` and `dogfood-check` from
-a clean worktree against the same base. Keep every `NOT_PRODUCED` reason visible.
+a clean worktree against the same base, and finish with `make dogfood-seal BASE=<sha>`, which moves
+the checked CEM out of the shared tracked path. Keep every `NOT_PRODUCED` reason visible.
 
 ## Verify
 
