@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/Beamfall/corvint/internal/worklistadapter"
 	"github.com/Beamfall/corvint/internal/workqueue"
@@ -71,21 +71,68 @@ func runWorkInit(_ context.Context, root string, arguments []string, stdout, std
 		{worklistPath, []byte(workEmptyWorklist), 0644},
 		{workAdapterPath, []byte(workAdapterScript), 0755},
 	}
+	repository, err := os.OpenRoot(root)
+	if err != nil {
+		fmt.Fprintln(stderr, "corvint work init:", err)
+		return 2
+	}
+	defer repository.Close()
 	for _, file := range files {
-		if _, err := os.Lstat(filepath.Join(root, file.path)); !errors.Is(err, os.ErrNotExist) {
+		if _, err := repository.Lstat(file.path); !errors.Is(err, os.ErrNotExist) {
 			fmt.Fprintf(stderr, "corvint work init: %s already exists; nothing was written\n", file.path)
 			return 2
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(root, ".corvint"), 0755); err != nil {
+	directoryInfo, err := repository.Lstat(".corvint")
+	createdDirectory := false
+	if errors.Is(err, os.ErrNotExist) {
+		err = repository.Mkdir(".corvint", 0755)
+		if err == nil {
+			createdDirectory = true
+			directoryInfo, err = repository.Lstat(".corvint")
+		}
+	}
+	if err != nil || !directoryInfo.IsDir() || directoryInfo.Mode()&os.ModeSymlink != 0 {
+		if err == nil {
+			err = errors.New(".corvint must be a repository-local directory, not a symlink")
+		}
+		rollbackWorkAdoptionDirectory(repository, createdDirectory)
 		fmt.Fprintln(stderr, "corvint work init:", err)
 		return 2
 	}
-	for _, file := range files {
-		if err := file.write(root); err != nil {
-			fmt.Fprintln(stderr, "corvint work init:", err)
-			return 2
+	directory, err := repository.OpenRoot(".corvint")
+	if err != nil {
+		rollbackWorkAdoptionDirectory(repository, createdDirectory)
+		fmt.Fprintln(stderr, "corvint work init:", err)
+		return 2
+	}
+	openedInfo, err := directory.Stat(".")
+	if err != nil || !os.SameFile(directoryInfo, openedInfo) {
+		directory.Close()
+		rollbackWorkAdoptionDirectory(repository, createdDirectory)
+		if err == nil {
+			err = errors.New(".corvint changed during initialization")
 		}
+		fmt.Fprintln(stderr, "corvint work init:", err)
+		return 2
+	}
+	created, err := writeWorkAdoptionFiles(directory, files)
+	if err == nil {
+		var after os.FileInfo
+		after, err = repository.Lstat(".corvint")
+		if err == nil && !os.SameFile(openedInfo, after) {
+			err = errors.New(".corvint changed during initialization")
+		}
+	}
+	if err != nil {
+		rollbackWorkAdoptionFiles(directory, created)
+		directory.Close()
+		rollbackWorkAdoptionDirectory(repository, createdDirectory)
+		fmt.Fprintln(stderr, "corvint work init:", err)
+		return 2
+	}
+	_ = directory.Close()
+	for _, file := range files {
 		fmt.Fprintln(stdout, file.path)
 	}
 	return 0
@@ -127,18 +174,62 @@ type workAdoptionFile struct {
 	mode os.FileMode
 }
 
-func (file workAdoptionFile) write(root string) error {
-	handle, err := os.OpenFile(filepath.Join(root, file.path), os.O_WRONLY|os.O_CREATE|os.O_EXCL, file.mode)
-	if err != nil {
-		return err
+func (file workAdoptionFile) name() (string, error) {
+	const prefix = ".corvint/"
+	name := strings.TrimPrefix(file.path, prefix)
+	if name == file.path || name == "" || strings.Contains(name, "/") {
+		return "", fmt.Errorf("invalid adoption path %q", file.path)
 	}
-	if _, err = handle.Write(file.raw); err != nil {
+	return name, nil
+}
+
+func (file workAdoptionFile) write(root *os.Root) (string, error) {
+	name, err := file.name()
+	if err != nil {
+		return "", err
+	}
+	handle, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, file.mode)
+	if err != nil {
+		return "", err
+	}
+	written, err := handle.Write(file.raw)
+	if err == nil && written != len(file.raw) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
 		handle.Close()
-		return err
+		return name, err
 	}
 	if err = handle.Chmod(file.mode); err != nil {
 		handle.Close()
-		return err
+		return name, err
 	}
-	return handle.Close()
+	return name, handle.Close()
+}
+
+func writeWorkAdoptionFiles(root *os.Root, files []workAdoptionFile) ([]string, error) {
+	created := make([]string, 0, len(files))
+	for _, file := range files {
+		name, err := file.write(root)
+		if name != "" {
+			created = append(created, name)
+		}
+		if err != nil {
+			rollbackWorkAdoptionFiles(root, created)
+			return nil, err
+		}
+	}
+	return created, nil
+}
+
+func rollbackWorkAdoptionFiles(root *os.Root, created []string) {
+	for index := len(created) - 1; index >= 0; index-- {
+		_ = root.Remove(created[index])
+	}
+}
+
+func rollbackWorkAdoptionDirectory(root *os.Root, created bool) {
+	if created {
+		_ = root.Remove(".corvint")
+	}
 }

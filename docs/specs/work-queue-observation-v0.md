@@ -566,7 +566,9 @@ without a new policy vocabulary, store root, or adapter protocol. They change no
   limit 512), `.corvint/worklist.json` (an empty `corvint-worklist/0`), and the executable
   `.corvint/work-queue-adapter`, which runs `corvint work adapter`. NAME must yield a policy
   the WQO-V0-001 parser accepts. If any of the three paths exists, init writes nothing and
-  exits 2. Init neither stages nor commits; until the three files are committed, observe
+  exits 2. Initialization is rooted in the repository, rejects a symlinked `.corvint`, and
+  rolls back files it created if any later write fails. Init neither stages nor commits;
+  until the three files are committed, observe
   returns `ERROR/SOURCE_UNQUALIFIED`. Because the observer runs the adapter under the
   fixed VPO-V0-022 `PATH`, `corvint` must be installed in `/opt/homebrew/bin` or
   `/usr/local/bin`; otherwise observation fails `ADAPTER_FAILED`.

@@ -21,6 +21,10 @@ on an incomplete initial capture ("initial capture did not retain incomplete sco
 `WQO-V0-032` codes became `MALFORMED_INPUT`). Restricting qualification to the adoption mapping kept
 those witnesses and the self-dogfood contract unchanged.
 
+Pre-landing review reproduced a symlink escape and an interrupted-write residue in `work init`.
+The repair roots every write with `os.Root`, rejects a symlinked `.corvint`, delays success output,
+and rolls back files created by a failed or racing initialization.
+
 `TestWorkAdoptedRepositoryWorklist` starts from a clean fixture and runs init, a refused second
 init, commit, observe, and propose-wave over four verification tickets. One is a suite batch, one a
 failure-classification repair, one a test-validity receipt, and one a cleanup/retry that shares

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -103,6 +104,57 @@ func TestWorkAdoptedRepositoryWorklist(t *testing.T) {
 	}
 	if !reflect.DeepEqual(committed, materializationManifest(t, root)) {
 		t.Fatal("observe or propose-wave mutated the repository")
+	}
+}
+
+func TestWorkInitRejectsSymlinkedDirectory(t *testing.T) {
+	t.Parallel()
+	root := materializationFixture(t)
+	external := t.TempDir()
+	if err := os.Symlink(external, filepath.Join(root, ".corvint")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	var stdout, stderr bytes.Buffer
+	if exit := run([]string{"--root", root, "work", "init", "--repository", "fixture"}, strings.NewReader(""), &stdout, &stderr); exit != 2 {
+		t.Fatalf("init exit=%d stdout=%s stderr=%s", exit, &stdout, &stderr)
+	}
+	entries, err := os.ReadDir(external)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 || stdout.Len() != 0 {
+		t.Fatalf("symlink escape wrote outside repository: entries=%v stdout=%q", entries, &stdout)
+	}
+}
+
+func TestWorkInitRollsBackCreatedFiles(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "second"), []byte("racing writer\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	directory, err := os.OpenRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer directory.Close()
+	files := []workAdoptionFile{
+		{path: ".corvint/first", raw: []byte("created\n"), mode: 0644},
+		{path: ".corvint/second", raw: []byte("must not replace\n"), mode: 0644},
+	}
+	created, err := writeWorkAdoptionFiles(directory, files)
+	if err == nil {
+		t.Fatal("racing target did not refuse initialization")
+	}
+	if len(created) != 0 {
+		t.Fatalf("failed initialization reported created files: %v", created)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "first")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("created file survived rollback: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "second"))
+	if err != nil || string(raw) != "racing writer\n" {
+		t.Fatalf("racing file changed: %q, %v", raw, err)
 	}
 }
 
