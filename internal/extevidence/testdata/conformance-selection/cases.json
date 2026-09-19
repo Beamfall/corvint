@@ -498,6 +498,176 @@
    "selected": [],
    "relevant": [],
    "safe_to_narrow": false
+  },
+  {
+   "name": "multihop-second-hop-uncovered",
+   "record": "multihop.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [],
+   "state": "full-relevant-suite-required",
+   "codes": [
+    "no-external-evidence"
+   ],
+   "selected": [
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go"
+   ],
+   "safe_to_narrow": false
+  },
+  {
+   "name": "multihop-every-hop-verified",
+   "record": "multihop-covered.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [],
+   "state": "narrow-selection-allowed",
+   "codes": [],
+   "selected": [
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go"
+   ],
+   "safe_to_narrow": true
+  },
+  {
+   "name": "multihop-cycle-terminates",
+   "record": "cycle.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [],
+   "state": "narrow-selection-allowed",
+   "codes": [],
+   "selected": [
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go"
+   ],
+   "safe_to_narrow": true
+  },
+  {
+   "name": "multihop-depth-truncated",
+   "record": "deep.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [],
+   "state": "full-relevant-suite-required",
+   "codes": [
+    "obligation-depth-truncated"
+   ],
+   "selected": [
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go",
+    "application:pkg/main_test.go"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go"
+   ],
+   "safe_to_narrow": false
+  },
+  {
+   "name": "checkout-clean-inspected",
+   "record": "verifies.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [
+    "e2e"
+   ],
+   "state": "narrow-selection-allowed",
+   "codes": [],
+   "selected": [
+    "application:pkg/main_test.go",
+    "e2e:tests/account.spec.ts"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go",
+    "e2e:tests/account.spec.ts"
+   ],
+   "safe_to_narrow": true,
+   "checkout": "clean"
+  },
+  {
+   "name": "checkout-dirty",
+   "record": "verifies.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [
+    "e2e"
+   ],
+   "state": "full-relevant-suite-required",
+   "codes": [
+    "checkout-worktree-dirty"
+   ],
+   "selected": [
+    "application:pkg/main_test.go"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go",
+    "e2e:tests/account.spec.ts"
+   ],
+   "safe_to_narrow": false,
+   "checkout": "dirty"
+  },
+  {
+   "name": "checkout-unreadable",
+   "record": "verifies.json",
+   "profile": "strict",
+   "changed": [
+    "pkg/main.go"
+   ],
+   "worktree": [],
+   "incomplete": [],
+   "bind": [
+    "e2e"
+   ],
+   "state": "full-relevant-suite-required",
+   "codes": [
+    "checkout-worktree-unreadable"
+   ],
+   "selected": [
+    "application:pkg/main_test.go"
+   ],
+   "relevant": [
+    "application:pkg/main_test.go",
+    "e2e:tests/account.spec.ts"
+   ],
+   "safe_to_narrow": false,
+   "checkout": "unreadable"
   }
  ]
 }

@@ -656,19 +656,28 @@ ESV-V0-004	docs/specs/experimental-source-views-v0.md	140	Refuse malformed input
 ESV-V0-005	docs/specs/experimental-source-views-v0.md	153	Remain opt-in under `experimental-source-view/0`, with no edits to existing publ
 ESV-V0-006	docs/specs/experimental-source-views-v0.md	156	Treat focused synthetic correctness checks as development evidence only. The
 ESV-V0-007	docs/specs/experimental-source-views-v0.md	161	The opt-in development wrapper captures exactly one automatic canonical packet
-ETS-V0-001	docs/specs/external-test-selection-v0.md	50	`corvint affected` MUST accept `--provider FILE` (up to 4), `--repository ID=DIR
-ETS-V0-002	docs/specs/external-test-selection-v0.md	55	With `--provider`, `advice` MUST gain `test_selection` with schema
-ETS-V0-003	docs/specs/external-test-selection-v0.md	61	`state` is exactly one of `narrow-selection-allowed`,
-ETS-V0-004	docs/specs/external-test-selection-v0.md	67	The strict profile admits `verifies` and `asserts`; the coverage profile also
-ETS-V0-005	docs/specs/external-test-selection-v0.md	69	A relation qualifies only when its type is admitted, its evidence is `declared`
-ETS-V0-006	docs/specs/external-test-selection-v0.md	74	Any record, identity, binding, freshness, verification, or unsupported-relation
-ETS-V0-007	docs/specs/external-test-selection-v0.md	79	Every selected and candidate row MUST carry the provider, provider revision, ent
-ETS-V0-008	docs/specs/external-test-selection-v0.md	84	Every candidate, uncovered obligation, and blocking reason MUST carry a named co
-ETS-V0-009	docs/specs/external-test-selection-v0.md	87	`mandatory` MUST echo every mandatory check unchanged. Selection never removes,
-ETS-V0-010	docs/specs/external-test-selection-v0.md	89	Rows are sorted by a total key. Every list is bounded at 64 rows and `omitted`
-ETS-V0-011	docs/specs/external-test-selection-v0.md	91	The conformance corpus MUST cover positive, negative, stale, missing, ambiguous,
-ETS-V0-012	docs/specs/external-test-selection-v0.md	94	The evaluation MUST report precision, unsafe-narrowing rate, abstention accuracy
-ETS-V0-013	docs/specs/external-test-selection-v0.md	96	The member MUST carry no file body, credential, or resolved checkout directory.
+ETS-V0-001	docs/specs/external-test-selection-v0.md	51	`corvint affected` MUST accept `--provider FILE` (up to 4), `--repository ID=DIR
+ETS-V0-002	docs/specs/external-test-selection-v0.md	56	With `--provider`, `advice` MUST gain `test_selection` with schema
+ETS-V0-003	docs/specs/external-test-selection-v0.md	62	`state` is exactly one of `narrow-selection-allowed`,
+ETS-V0-004	docs/specs/external-test-selection-v0.md	68	The strict profile admits `verifies` and `asserts`; the coverage profile also
+ETS-V0-005	docs/specs/external-test-selection-v0.md	70	A relation qualifies only when its type is admitted, its evidence is `declared`
+ETS-V0-006	docs/specs/external-test-selection-v0.md	75	Any record, identity, binding, freshness, verification, or unsupported-relation
+ETS-V0-007	docs/specs/external-test-selection-v0.md	80	Every selected and candidate row MUST carry the provider, provider revision, ent
+ETS-V0-008	docs/specs/external-test-selection-v0.md	85	Every candidate, uncovered obligation, and blocking reason MUST carry a named co
+ETS-V0-009	docs/specs/external-test-selection-v0.md	88	`mandatory` MUST echo every mandatory check unchanged. Selection never removes,
+ETS-V0-010	docs/specs/external-test-selection-v0.md	90	Rows are sorted by a total key. Every list is bounded at 64 rows and `omitted`
+ETS-V0-011	docs/specs/external-test-selection-v0.md	92	The conformance corpus MUST cover positive, negative, stale, missing, ambiguous,
+ETS-V0-012	docs/specs/external-test-selection-v0.md	95	The evaluation MUST report precision, unsafe-narrowing rate, abstention accuracy
+ETS-V0-013	docs/specs/external-test-selection-v0.md	97	The member MUST carry no file body, credential, or resolved checkout directory.
+ETS-V1-001	docs/specs/external-test-selection-v1.md	46	The obligation walk MUST replace the one-hop widening. It is bounded at
+ETS-V1-002	docs/specs/external-test-selection-v1.md	49	A cut MUST block every edge entity with `obligation-depth-truncated` or
+ETS-V1-003	docs/specs/external-test-selection-v1.md	51	A cut MUST add one `unknowns` row per edge entity with `code`, `provider`,
+ETS-V1-004	docs/specs/external-test-selection-v1.md	53	The walk follows only relations the provider declared. It infers no relation,
+ETS-V1-005	docs/specs/external-test-selection-v1.md	55	`corvint affected` MUST read each resolved checkout's dirty paths once, with the
+ETS-V1-006	docs/specs/external-test-selection-v1.md	59	A checkout is judged as a whole: any dirty path in it blocks every side it binds
+ETS-V1-007	docs/specs/external-test-selection-v1.md	61	A row whose every checkout side was inspected MUST NOT carry
+ETS-V1-008	docs/specs/external-test-selection-v1.md	64	Both extensions can only widen. For every labelled case, reading a clean, dirty,
+ETS-V1-009	docs/specs/external-test-selection-v1.md	67	The member schema stays `external-test-selection/0`. The new codes and the
 FPK-V0-001	docs/specs/falsifiable-packet-v0.md	55	`prove` MUST be read-only. It MUST NOT write repository, trace, or
 FPK-V0-002	docs/specs/falsifiable-packet-v0.md	58	The document MUST embed the packet that `query` would emit for the same root,
 FPK-V0-003	docs/specs/falsifiable-packet-v0.md	66	`falsifier` MUST be one of `history-consistent`, `reference-resolves`,

@@ -36,7 +36,8 @@ this request as "EEP slice 3".
 ## Definitions
 
 - **Obligation**: a changed path, an entity a changed path maps to, or an entity one relation hop
-  downstream of such an entity. Narrowing must justify every obligation.
+  downstream of such an entity. Narrowing must justify every obligation. `ETS-V1-001` replaces the
+  one hop with a bounded transitive walk.
 - **Qualifying relation**: a relation from a test path to an obligation entity whose type the
   profile admits and which meets every condition of `ETS-V0-005`.
 - **Selected test**: the test side of a qualifying relation. **Candidate test**: the test side of
@@ -102,8 +103,8 @@ this request as "EEP slice 3".
 - Executing, scheduling, or ranking tests; changing the exit code; CEM or Change Frontier changes;
   an MCP surface; a product-specific adapter; inferring relations.
 - Inspecting a bound checkout's worktree. Rows from a checkout carry
-  `checkout-worktree-not-inspected`.
-- Obligations beyond one downstream hop.
+  `checkout-worktree-not-inspected`. `ETS-V1-005` now reads it.
+- Obligations beyond one downstream hop. `ETS-V1-001` now walks them.
 - The simpler baseline is "run what `advice.checks` says". It stays the default and stays in force:
   this slice only adds advice about which additional tests are enough.
 

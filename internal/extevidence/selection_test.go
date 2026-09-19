@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,6 +30,7 @@ type selectionCase struct {
 	Selected     []string          `json:"selected"`
 	Relevant     []string          `json:"relevant"`
 	SafeToNarrow bool              `json:"safe_to_narrow"`
+	Checkout     string            `json:"checkout"`
 }
 
 const (
@@ -102,7 +105,15 @@ func fixtureRecord(t *testing.T, p pair, fixtures string, c selectionCase) strin
 }
 
 func selectionInput(c selectionCase) SelectionInput {
-	return SelectionInput{Changed: c.Changed, Worktree: c.Worktree, Incomplete: c.Incomplete, Profile: c.Profile, Limit: 20}
+	return SelectionInput{Changed: c.Changed, Worktree: c.Worktree, Incomplete: c.Incomplete, Profile: c.Profile, Limit: 20, CheckoutStatus: checkoutStatus[c.Checkout]}
+}
+
+// checkoutStatus stubs a bound checkout's worktree by case label; an unset
+// label leaves every checkout uninspected, as V0 did.
+var checkoutStatus = map[string]func(context.Context, string) ([]string, error){
+	"clean":      func(context.Context, string) ([]string, error) { return nil, nil },
+	"dirty":      func(context.Context, string) ([]string, error) { return []string{"tests/account.spec.ts"}, nil },
+	"unreadable": func(context.Context, string) ([]string, error) { return nil, errors.New("status unavailable") },
 }
 
 func runSelection(t *testing.T, p pair, source string, checkouts []Checkout, input SelectionInput) (map[string]any, []byte) {
@@ -366,5 +377,54 @@ func TestSelectionPrivate(t *testing.T) {
 	}
 	if len(selection["untrusted_text_fields"].([]any)) == 0 {
 		t.Fatal("rule and reference must be named untrusted text")
+	}
+}
+
+// TestSelectionWalkBudget: a walk that would pass the entity bound stops,
+// blocks the entity at its edge, and reports the cut (ETS-V1-002, ETS-V1-003).
+func TestSelectionWalkBudget(t *testing.T) {
+	t.Parallel()
+	p := newPair(t)
+	c := selectionCase{Record: "multihop-covered.json", Profile: ProfileStrict, Changed: []string{"pkg/main.go"}}
+	data, err := os.ReadFile(fixtureRecord(t, p, selectionFixtures, c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := writeRecord(t, t.TempDir(), "provider.json", mutate(t, data, func(record map[string]any) {
+		for i := range MaxObligationEntities {
+			id := fmt.Sprintf("leaf-%03d", i)
+			record["entities"] = append(record["entities"].([]any), map[string]any{"id": id, "kind": "capability", "summary": "Leaf."})
+			record["relations"] = append(relations(record), map[string]any{
+				"from": map[string]any{"provider": "mockdocs", "entity": "cap-a"}, "to": map[string]any{"provider": "mockdocs", "entity": id},
+				"type": "depends-on", "evidence": "declared", "rule": "dependency-map", "reference": "ci/dependency-map",
+			})
+		}
+	}))
+	selection, _ := runSelection(t, p, source, nil, selectionInput(c))
+	if selection["state"] != SelectionFull || !selectionCodes(selection)["obligation-budget-exhausted"] {
+		t.Fatalf("a walk past the entity bound must widen and say so: %v %v", selection["state"], selection["unknowns"])
+	}
+}
+
+// TestSelectionExtensionsOnlyWiden: reading a checkout can only keep or widen
+// a case's state, never narrow it (ETS-V1-008).
+func TestSelectionExtensionsOnlyWiden(t *testing.T) {
+	t.Parallel()
+	p := newPair(t)
+	cases, dirs := allCases(t)
+	for i, c := range cases {
+		source, checkouts := fixtureRecord(t, p, dirs[i], c), bindCase(p, c)
+		c.Checkout = ""
+		uninspected, _ := runSelection(t, p, source, checkouts, selectionInput(c))
+		for _, label := range []string{"clean", "dirty", "unreadable"} {
+			c.Checkout = label
+			inspected, _ := runSelection(t, p, source, checkouts, selectionInput(c))
+			if inspected["state"] == SelectionNarrow && uninspected["state"] != SelectionNarrow {
+				t.Errorf("%s: a %s checkout narrowed %v", c.Name, label, uninspected["state"])
+			}
+			if label != "clean" && len(checkouts) != 0 && len(inspected["selected"].([]any)) > len(uninspected["selected"].([]any)) {
+				t.Errorf("%s: a %s checkout selected more tests", c.Name, label)
+			}
+		}
 	}
 }
