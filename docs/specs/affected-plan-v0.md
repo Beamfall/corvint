@@ -341,7 +341,7 @@ worst case of `make gate-affected` is the cost of `make go-test`, never a skippe
 | AFP-V0-013 | `tools/corvint-pr-tests` and `.github/workflows/ci.yml` | `TestSelectedFailureAndFallback`, `TestInterruptionLeavesNoLiveDescendant`; trusted pins empty, hosted execution unavailable |
 | AFP-V0-015 | `tools/corvint-pr-tests/container.go` and indexed shadow execution | `TestContainerProfileAndArchive`, `TestColdRuntime`, `TestFrozenRowIndex`, `TestDockerCLIInterruption`, `TestContainerCleanupRefusal`; real Linux row/hosted NOT_RUN |
 | AFP-V0-014 | `tools/corvint-pr-tests/shadow.go` | `TestQualificationAndTerminalFailures`, `TestToolIdentityRequiresCurrentGoVersion`; frozen 200-row qualification NOT_RUN |
-| AFP-V0-016 | `.github/workflows/ci-control-plane.yml`; the `main` repository ruleset | `actionlint`; posted status on a real PR after merge NOT_RUN; ruleset not yet created |
+| AFP-V0-016 | `.github/workflows/ci-control-plane.yml`; the `main` repository ruleset | `actionlint`; `success` posted on PR #26 (run 35444060752) and PR #24 (run 35446378936); ruleset 23699808 active; `failure` path NOT_RUN on a real PR |
 | AFP-V0-017 | `.github/workflows/pr-tests-qualification.yml` | `actionlint`; dispatch NOT_RUN (`main` has fewer than 201 first-parent commits) |
 | AFP-V0-009 | `affectedAdvice`, `compileAffectedAdvice`, `mandatoryAffectedChecks`, `advisoryAffectedChecks`, `shellQuoteJoin` in `cmd/corvint/affected.go` | `TestAffectedAdviceJoinsMandatoryGateAndAdvisoryPackages`, `TestAffectedAdviceReportsNoDeclaredGate`, `TestAffectedAdviceKeepsMandatoryGateAndNeverAdvisesExclusions`, `TestAffectedReceiptMembersAreClosedAndByteStable` (tightened to assert `advice`'s raw JSON key order), `TestAffectedAdviceBoundsTheDeclarationRead`, `TestShellQuoteJoinEscapesMetacharacters`, `TestAffectedAdviceTruncatedMandatoryDeclarationSuppressesNoGate`, `TestAffectedAdviceCapsMandatoryChecksAtSixteen`, `TestAffectedAdviceSkipsCommentsInVerifyFence` |
 
@@ -362,10 +362,10 @@ if a shadow run over 200 historical commits shows any selected-set miss against 
 the plan did not mark `UNKNOWN`. The fast tier may become a push gate only after that same shadow
 run passes; until then it is an everyday narrowing whose fallback is the full run.
 
-Protected workflow/ruleset status: **NOT_VERIFIED**. The repository workflow and literal pins
-alone do not protect their own control plane. Before enabling any trust pin, the owner must
-configure and review the applicable GitHub required-workflow/ruleset policy so a PR cannot
-replace the trusted workflow or its pins. Keep pins empty until that admission is established.
+Protected workflow/ruleset status: **VERIFIED** (2026-09-19). The repository workflow and literal
+pins alone do not protect their own control plane; decision 0320 establishes the admission on the
+free plan with AFP-V0-016 and ruleset 23699808, whose settings and observed runs are recorded in
+`tools/corvint-pr-tests/README.md`. Keep pins empty until AFP-V0-017 produces a PASS.
 The runtime environment is an allowlist with exact recorded bytes, a fixed absolute Go PATH,
 `/usr/bin/cc`, `GOENV=off`, `LANG=C`, `LC_ALL=C`, `TZ=UTC`, and exclusively owned HOME/TMP/cache
 under `/tmp/corvint-pr-tests-runtime`. An existing runtime path is refused; owned runtime state is
