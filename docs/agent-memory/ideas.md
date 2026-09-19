@@ -1,7 +1,7 @@
 ---
 name: ideas
 description: Broader future work, features, and unscheduled directions
-updated: 2026-09-18
+updated: 2026-09-19
 ---
 
 # Ideas
@@ -12,6 +12,9 @@ Future features and larger directions. Promote to `docs/specs/` when an idea mat
 ### YYYY-MM-DD <area>: <one-line title>
 One paragraph: what, where (file:line), why it matters, and what done looks like.
 -->
+
+### 2026-09-19 work-queue: let Corvint's own `decision-0046-v0` mapping qualify store scope
+Decision 0314 limits WQO-V0-046 to `repository-worklist-v0`, so Corvint's self-dogfood observation stays `UNKNOWN/SOURCE_UNQUALIFIED` and `propose-wave` still abstains on this repository. The same byte-reproduction argument holds for `docs/worklist.json`. Done means the check in `workMappingReproduced` (`cmd/corvint/work.go`) accepts both mappings, the WQO-V0-021/025/032 final-check fixtures in `cmd/corvint/work_final_check_test.go` get their incomplete initial capture another way, and the WQO-V0-017 paragraph is amended.
 
 ### 2026-09-18 extevidence: test selection beyond one hop and into checkout worktrees (ETS-V0 follow-up)
 `docs/specs/external-test-selection-v0.md` stops obligations one relation hop downstream of a changed entity, and never reads a bound checkout's worktree (rows say `checkout-worktree-not-inspected`). Both keep the selection fail-closed only as far as the record is complete. Done means a bounded transitive obligation walk and a per-checkout dirty read, each with conformance cases proving they only ever widen.
