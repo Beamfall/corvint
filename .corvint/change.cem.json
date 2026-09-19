@@ -1,5 +1,5 @@
 {
-  "baseRevision": "6a423ac091d848b8ac5b49e8002c61c252993ac3",
+  "baseRevision": "cbf7079be93cd2a0410cc0d23834742f13f7b1c1",
   "evidence": [
     {
       "blobOid": "b3b49214a9fc4de736cc3d3c4fb1621f01da5924",
@@ -182,14 +182,14 @@
         }
       ],
       "disposition": "supported",
-      "id": "hunk:sha256:81dbe0f089547935699d818a33c97548e13d2d26afe105b675bdbd1829dace02",
+      "id": "hunk:sha256:5fba2d8431b8c5623110163de4241ee1eb0f83c31f1539239508c58006feb224",
       "newRange": {
         "count": 14,
-        "start": 279
+        "start": 282
       },
       "oldRange": {
         "count": 6,
-        "start": 279
+        "start": 282
       },
       "path": "README.md",
       "reason": "evidence-backed"
@@ -582,14 +582,34 @@
         }
       ],
       "disposition": "supported",
-      "id": "hunk:sha256:2781b5a8a61816b26b074c91530cf16b11aa12fb6c66773210e98880764aa771",
+      "id": "hunk:sha256:c9bb47c8fca7d5c03983a3c54be32d6fa1a267470d905cde84b6f0283a87e4d3",
       "newRange": {
-        "count": 43,
+        "count": 48,
         "start": 7
       },
       "oldRange": {
         "count": 6,
         "start": 7
+      },
+      "path": "docs/BUILD-LOG.md",
+      "reason": "evidence-backed"
+    },
+    {
+      "basis": [
+        {
+          "evidenceId": "evidence:sha256:177e82cf5d62a1ceea98f0c1d903b26e796b6568313ec05afc27498c650b77d5",
+          "relation": "specification"
+        }
+      ],
+      "disposition": "supported",
+      "id": "hunk:sha256:a4b717581ef4eb174cd58c0de9aa268ca975cc6cc51841740c2bb1254d345695",
+      "newRange": {
+        "count": 6,
+        "start": 73
+      },
+      "oldRange": {
+        "count": 7,
+        "start": 31
       },
       "path": "docs/BUILD-LOG.md",
       "reason": "evidence-backed"
@@ -682,7 +702,7 @@
         }
       ],
       "disposition": "supported",
-      "id": "hunk:sha256:eab2d2872eac11df5cd01a4f1532f5665949e3d6cd6b264f72e7a9665a89dfeb",
+      "id": "hunk:sha256:c4a2ecbced82747439f9522342a0f4029a82ff5feb3f736362905cb229f3164b",
       "newRange": {
         "count": 7,
         "start": 254
@@ -1327,6 +1347,6 @@
       "reason": "evidence-backed"
     }
   ],
-  "patchSha256": "a12765d8c41b8e757de1d7a2e72a0719306617b47df311ebffd1e22077cf5ec3",
+  "patchSha256": "d96c200d7dd0c3d91973bcb23a7dfc6bd607237d70911d7f9779a22721e99910",
   "spec": "cem/0.2"
 }
