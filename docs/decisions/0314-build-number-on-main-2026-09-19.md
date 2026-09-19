@@ -34,6 +34,9 @@ The `--version` wire changes. An extension built before this change refuses the 
 tree, so they move together. A shallow clone counts only the commits it has, so a release build
 needs full first-parent history. Historical evidence keeps its original `Corvint 0.4.0aN` strings.
 
+`CRB-V0-003` in `docs/specs/corvint-rebrand-v0.md` and the `CORVINT_BIN` override rule in
+`docs/DOGFOOD.md` §4 are amended to the new banner; version equality is unchanged.
+
 ## Rollback
 
 Revert the change: the banner returns to `Corvint <VERSION>` and the extension and dogfood checks
