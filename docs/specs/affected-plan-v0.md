@@ -3,7 +3,7 @@
 Owner: Russell Lewis
 Date: 2026-09-01
 Requirement prefix: `AFP-V0`
-Intent status: accepted for AFP-V0-008 (decision 0057) and AFP-V0-009 (decision 0052); AFP-V0-013/014/015 accepted (decision 0289); other AFP-V0 requirements proposed
+Intent status: accepted for AFP-V0-008 (decision 0057) and AFP-V0-009 (decision 0052); AFP-V0-013/014/015 accepted (decision 0289); AFP-V0-016/017 accepted (decision 0320); other AFP-V0 requirements proposed
 Delivery status: experimental
 Authoritative inputs: `docs/specs/go-live-test-provider-v0.md` (provider plan wire and non-goals),
 `docs/specs/live-proof-carrying-verification-v0.md` (future composer, not-started),
@@ -11,9 +11,9 @@ Authoritative inputs: `docs/specs/go-live-test-provider-v0.md` (provider plan wi
 
 ## Agent digest
 - Claim: `corvint affected` emits a read-only, non-authoritative affected-test selection plan with provider-ready Go package paths.
-- Status: accepted for AFP-V0-008 (decision 0057) and AFP-V0-009 (decision 0052); AFP-V0-013/014/015 accepted (decision 0289); other AFP-V0 requirements proposed/experimental
+- Status: accepted for AFP-V0-008 (decision 0057) and AFP-V0-009 (decision 0052); AFP-V0-013/014/015 accepted (decision 0289); AFP-V0-016/017 accepted (decision 0320); other AFP-V0 requirements proposed/experimental
 - Exists: `internal/liveverify/affected`, `corvint affected`, `cmd/corvint/affected_test.go`, the `advice` member (AFP-V0-009: repository-declared mandatory checks, one advisory Go command, the unknown frontier), the `--base FULL_COMMIT_ID` range form and `range` member (AFP-V0-010), and the `make gate-affected` fast tier over the receipt (AFP-V0-011: `script/gate-affected.sh`, fail-closed to the full `go-test` run; not the push gate), whose union is attributed per dirty path from a static repository index of imports and path literals (AFP-V0-012); `tools/corvint-pr-tests` and `.github/workflows/ci.yml` remain full until separately pinned AFP-V0-014 qualification.
-- Blocked on: the LPCV-V0 composer accepting or replacing this wire; a 200-commit shadow run.
+- Blocked on: the LPCV-V0 composer accepting or replacing this wire; the 200-row qualification, which needs 201 first-parent commits on `main` (AFP-V0-017).
 - Read next: Requirements; Non-goals and authority; Failure modes.
 
 ## Intent and scope
@@ -275,6 +275,25 @@ Fake Docker regression success is not real-container success. Hosted execution a
 workflow admission remain separate and unverified until observed. Rollback removes the launcher
 and container qualification; full fallback remains available.
 
+### Hosted control plane and qualification
+
+- **AFP-V0-016:** (accepted by decision 0320) `.github/workflows/ci-control-plane.yml` SHALL run
+  on `workflow_run` after `CI`, never check out or execute PR code, and post the commit status
+  `ci-control-plane` on the PR head: `failure` when a changed or renamed-from path is under
+  `.github/` or the PR exceeds the files API's 3000-file listing, `success` otherwise. An API
+  failure MUST post nothing. Its permissions MUST be only `contents: read`, `pull-requests:
+  read` and `statuses: write`. The `main` ruleset SHALL require a pull request and the
+  `go-product` and `ci-control-plane` checks, with the repository admin role as the only
+  bypass, in pull-request mode.
+- **AFP-V0-017:** (accepted by decision 0320) `.github/workflows/pr-tests-qualification.yml`
+  SHALL be `workflow_dispatch` only, with `contents: read` and no persisted credentials. It
+  SHALL build the three trusted binaries from the dispatched `tool_source`, freeze the corpus
+  ending at `corpus_end`, run each requested row (`1` or all 200) on its own fresh runner
+  provisioned as `ci.yml`, and qualify only when every row job succeeded, with the frozen
+  driver. Concurrent rows on separate runners satisfy AFP-V0-014's campaign only because every
+  row identity must equal the frozen identity. It MUST NOT commit, pin, or publish anything
+  but workflow artifacts.
+
 ## Non-goals and authority
 
 No provider modification; execution only through the explicitly admitted AFP-V0-013 driver; no watcher or daemon (invariant 7,
@@ -322,6 +341,8 @@ worst case of `make gate-affected` is the cost of `make go-test`, never a skippe
 | AFP-V0-013 | `tools/corvint-pr-tests` and `.github/workflows/ci.yml` | `TestSelectedFailureAndFallback`, `TestInterruptionLeavesNoLiveDescendant`; trusted pins empty, hosted execution unavailable |
 | AFP-V0-015 | `tools/corvint-pr-tests/container.go` and indexed shadow execution | `TestContainerProfileAndArchive`, `TestColdRuntime`, `TestFrozenRowIndex`, `TestDockerCLIInterruption`, `TestContainerCleanupRefusal`; real Linux row/hosted NOT_RUN |
 | AFP-V0-014 | `tools/corvint-pr-tests/shadow.go` | `TestQualificationAndTerminalFailures`, `TestToolIdentityRequiresCurrentGoVersion`; frozen 200-row qualification NOT_RUN |
+| AFP-V0-016 | `.github/workflows/ci-control-plane.yml`; the `main` repository ruleset | `actionlint`; posted status on a real PR after merge NOT_RUN; ruleset not yet created |
+| AFP-V0-017 | `.github/workflows/pr-tests-qualification.yml` | `actionlint`; dispatch NOT_RUN (`main` has fewer than 201 first-parent commits) |
 | AFP-V0-009 | `affectedAdvice`, `compileAffectedAdvice`, `mandatoryAffectedChecks`, `advisoryAffectedChecks`, `shellQuoteJoin` in `cmd/corvint/affected.go` | `TestAffectedAdviceJoinsMandatoryGateAndAdvisoryPackages`, `TestAffectedAdviceReportsNoDeclaredGate`, `TestAffectedAdviceKeepsMandatoryGateAndNeverAdvisesExclusions`, `TestAffectedReceiptMembersAreClosedAndByteStable` (tightened to assert `advice`'s raw JSON key order), `TestAffectedAdviceBoundsTheDeclarationRead`, `TestShellQuoteJoinEscapesMetacharacters`, `TestAffectedAdviceTruncatedMandatoryDeclarationSuppressesNoGate`, `TestAffectedAdviceCapsMandatoryChecksAtSixteen`, `TestAffectedAdviceSkipsCommentsInVerifyFence` |
 
 Compatibility and drift: the provider bundle grammar is consumed, not redefined; if
