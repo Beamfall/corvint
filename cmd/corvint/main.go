@@ -368,23 +368,23 @@ func parseImpactArgumentsForPlatform(result options, arguments []string, platfor
 			result.impactLimit = limit
 			continue
 		}
-		if !positionalOnly && name == "--provider" {
+		if !positionalOnly && (name == "--provider" || name == "--provider-command") {
 			if !inline {
 				if index+1 >= len(arguments) || argparseOptionLike(arguments[index+1]) {
-					return result, argumentError("argument --provider: expected one argument")
+					return result, argumentError("argument " + name + ": expected one argument")
 				}
 				value = arguments[index+1]
 				index += 2
 			} else {
 				index++
 			}
-			if value == "" {
-				return result, argumentError("argument --provider: expected one argument")
+			// EEP-TR-001: only this explicit option reaches the command
+			// transport; EEP-TR-002: an argv defect is refused before launch.
+			source, err := providerSource(name, value, len(result.impactProviders))
+			if err != nil {
+				return result, err
 			}
-			if len(result.impactProviders) == extevidence.MaxProviders {
-				return result, argumentError(fmt.Sprintf("argument --provider: at most %d providers", extevidence.MaxProviders))
-			}
-			result.impactProviders = append(result.impactProviders, value)
+			result.impactProviders = append(result.impactProviders, source)
 			continue
 		}
 		if !positionalOnly && name == "--repository" {
@@ -1447,4 +1447,23 @@ func sharedIndexedContextFromEnvironment() gokernel.SharedIndexedContext {
 	}
 	go contextindex.LoadedEngineID()
 	return harnessSharedIndexedContext
+}
+
+// providerSource turns one `--provider` or `--provider-command` value into a
+// provider source under the shared provider bound.
+func providerSource(name, value string, selected int) (string, error) {
+	if value == "" {
+		return "", argumentError("argument " + name + ": expected one argument")
+	}
+	if selected == extevidence.MaxProviders {
+		return "", argumentError(fmt.Sprintf("argument %s: at most %d providers", name, extevidence.MaxProviders))
+	}
+	if name != "--provider-command" {
+		return value, nil
+	}
+	source, err := extevidence.ParseCommand(value)
+	if err != nil {
+		return "", argumentError("argument --provider-command: " + err.Error())
+	}
+	return source, nil
 }
