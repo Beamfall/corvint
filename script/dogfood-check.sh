@@ -188,6 +188,33 @@ cem_base_revision() {
   printf '%s' "$value"
 }
 
+# A seal commit has one parent and only renames that parent's CEM, unchanged, to
+# .corvint/changes/<parent>.cem.json (docs/DOGFOOD.md §4, DOGFOOD-013).
+is_seal_commit() {
+  local parent
+  parent=$(git -C "$repo" rev-parse --verify -q "$1^1") || return 1
+  git -C "$repo" rev-parse --verify -q "$1^2" >/dev/null && return 1
+  [[ $(git -C "$repo" diff-tree -r -M --no-commit-id --name-status "$parent" "$1") == \
+    "R100"$'\t'".corvint/change.cem.json"$'\t'".corvint/changes/$parent.cem.json" ]]
+}
+
+# The previous binding is the CEM committed at BASE, else the bind commit under
+# the newest seal reachable from BASE (DOGFOOD-014).
+previous_binding() {
+  local seal
+  if git -C "$repo" cat-file -e "$base:.corvint/change.cem.json" 2>/dev/null; then
+    printf '%s' "$base"
+    return
+  fi
+  while IFS= read -r seal; do
+    if is_seal_commit "$seal"; then
+      git -C "$repo" rev-parse "$seal^1"
+      return
+    fi
+  done < <(git -C "$repo" rev-list --no-merges --max-count=256 "$base" -- .corvint/changes)
+  return 1
+}
+
 unbound_not_observed() {
   printf 'dogfood-check: NOTE unbound-commits NOT_OBSERVED %s\n' "$1" >&2
 }
@@ -196,12 +223,9 @@ unbound_not_observed() {
 # base that no CEM committed in that window binds, and separately those bound
 # only by a retroactive binding commit (docs/DOGFOOD.md §4).
 report_unbound_commits() {
-  local previous_base window sidecar_commit sidecar_base bound covered='' retroactive_pairs='' not_normal unbound retroactive count
-  if ! git -C "$repo" cat-file -e "$base:.corvint/change.cem.json" 2>/dev/null; then
-    unbound_not_observed previous-cem-absent
-    return
-  fi
-  previous_base=$(cem_base_revision "$base") || { unbound_not_observed previous-cem-base-unavailable; return; }
+  local previous previous_base window sidecar_commit sidecar_base bound covered='' retroactive_pairs='' not_normal unbound retroactive count
+  previous=$(previous_binding) || { unbound_not_observed previous-cem-absent; return; }
+  previous_base=$(cem_base_revision "$previous") || { unbound_not_observed previous-cem-base-unavailable; return; }
   window=$(git -C "$repo" rev-list --no-merges --max-count=257 "$base" "^$previous_base") ||
     { unbound_not_observed window-unavailable; return; }
   if [[ $(printf '%s' "$window" | grep -c .) -gt 256 ]]; then
@@ -209,6 +233,10 @@ report_unbound_commits() {
     return
   fi
   while IFS= read -r sidecar_commit; do
+    if is_seal_commit "$sidecar_commit"; then
+      covered+=$sidecar_commit$'\n'
+      continue
+    fi
     sidecar_base=$(cem_base_revision "$sidecar_commit") || { unbound_not_observed window-cem-base-unavailable; return; }
     bound=$(git -C "$repo" rev-list "$sidecar_commit" "^$sidecar_base" "^$previous_base")
     if [[ $(git -C "$repo" log -1 --format='%(trailers:key=Corvint-Dogfood-Binding,valueonly)' "$sidecar_commit") == retroactive ]]; then
@@ -237,6 +265,11 @@ report_unbound_commits() {
 }
 
 resolve_anchor
+if is_seal_commit "$target"; then
+  printf 'dogfood-check: REFUSE sealed-head\n' >&2
+  printf '  HEAD only seals the bound CEM; check its parent: git checkout --detach HEAD^\n' >&2
+  exit 2
+fi
 git -C "$repo" diff --quiet "$base" "$target" -- .
 diff_status=$?
 if [[ $diff_status -gt 1 ]]; then

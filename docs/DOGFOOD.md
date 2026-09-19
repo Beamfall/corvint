@@ -91,7 +91,16 @@ $ git add .corvint/change.cem.json
 $ git commit -m "chore: bind change evidence"
 $ make dogfood-change BASE=BASE_SHA
 $ make dogfood-check BASE=BASE_SHA
+$ make dogfood-seal BASE=BASE_SHA
 ```
+
+`dogfood-seal` reruns `dogfood-check` and, only on PASS, commits `chore: seal change evidence`,
+which does nothing but rename `.corvint/change.cem.json` to
+`.corvint/changes/<bind-commit>.cem.json`. The CEM is bound and checked at the fixed `cem/0.2`
+path, and the seal moves it out of that one shared tracked path, so two open branches never edit
+the same file (decision 0319). A sealed HEAD is refused by `dogfood-check` (`sealed-head`); check
+its parent instead. `dogfood-change` refuses a change whose `BASE_SHA..HEAD` adds a sealed CEM
+(`sealed-cem-in-change`): to rework a sealed branch, revert or drop the seal commit first.
 
 Run `make gate` before the first `dogfood-change` or after the sidecar commit, not between them. Its
 archive step requires a clean worktree (`conformance/release-artifact-v0/archive_run.go:422-424`),
@@ -124,10 +133,13 @@ and whose digest is also recorded.
 
 Because `.corvint/change.cem.json` is one tracked path and each change's base is the commit before
 its first commit, interleaved sessions can leave committed work that no CEM binds. For a clean
-worktree with a change, `dogfood-check` reads the `baseRevision` of the CEM committed at
-`BASE_SHA` (the previous binding) and examines the non-merge commits reachable from `BASE_SHA` but
+worktree with a change, `dogfood-check` reads the `baseRevision` of the previous binding: the CEM
+committed at `BASE_SHA`, or, when `BASE_SHA` has none, the CEM in the parent of the newest seal
+commit reachable from it. It examines the non-merge commits reachable from `BASE_SHA` but
 not from that revision. A commit there is bound when some CEM committed in that window covers it:
-the sidecar commit and the commits after that CEM's own `baseRevision`. Every other commit is
+the sidecar commit and the commits after that CEM's own `baseRevision`. A seal commit, one that
+only renames its parent's CEM to `.corvint/changes/<parent>.cem.json`, is covered by that parent;
+any other commit that removes the CEM is not a seal. Every other commit is
 reported on stderr as `dogfood-check: NOTE unbound-commits count=N window=PREV..BASE`, followed by
 one `  unbound SHA` line per commit, newest first; nothing is printed when all are bound. When the
 base has no committed CEM, a CEM in the window has no parseable ancestor `baseRevision`, or the
@@ -415,6 +427,12 @@ they do not create execution authority, close a Frontier, or qualify the native 
   backlog-only intent as `NOT_PRODUCED` (`DOGFOOD-BIND-001` to `DOGFOOD-BIND-007`).
 - `DOGFOOD-012`: final checking reports commits covered only by a retroactive binding as
   `retroactive-bound-commits`, distinct from both normally bound and unbound commits.
+- `DOGFOOD-013`: a checked change's CEM leaves the shared tracked path only through `dogfood-seal`,
+  which commits after a passing check and only renames `.corvint/change.cem.json` to
+  `.corvint/changes/<bind-commit>.cem.json`; a sealed HEAD is refused by final checking and a change
+  that adds a sealed CEM is refused by `dogfood-change`.
+- `DOGFOOD-014`: final checking counts a seal commit as bound by its parent and, when the base has no
+  CEM, takes the previous binding from the parent of the newest seal reachable from the base.
 
 ## Feedback rule
 

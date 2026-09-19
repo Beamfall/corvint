@@ -15,7 +15,7 @@ GO_TEST_TIMEOUT ?= 30m
 # gate-affected appends the selected packages, so the flags cannot drift apart.
 GO_TEST_COMMAND = GOCACHE=$(CORVINT_GOCACHE) GOTOOLCHAIN=local go test -p 1 -count=1 -timeout $(GO_TEST_TIMEOUT)
 
-.PHONY: build gate gate-receipt-clear gate-receipt-test gate-affected gate-affected-test host-adapter-test go-version go-test go-vet cross-vet go-format-check go-format-test go-archive-gate go-archive-gate-test interop-gate spec-requirements-check spec-requirements-test requirement-definitions-check traceability-tests-check decision-numbers-check eol-policy-check eol-policy-test line-citations-check line-citations-test ci-least-privilege-check ci-least-privilege-test release-checklist-test analyzer-python-offline-build-test analyzer-python-ratchets-test release-artifact-reproducibility-test sql-native-ratchets sql-native-ratchets-test companion-release-gate public-release-check dogfood-change dogfood-check dogfood-bind-range dogfood-bind-range-test error-code-ownership-check error-code-ownership-test cem-verify-pr-test host-package-versions-check host-package-versions-test diagnostic-coverage-check go-archive-gate-injection-test
+.PHONY: build gate gate-receipt-clear gate-receipt-test gate-affected gate-affected-test host-adapter-test go-version go-test go-vet cross-vet go-format-check go-format-test go-archive-gate go-archive-gate-test interop-gate spec-requirements-check spec-requirements-test requirement-definitions-check traceability-tests-check decision-numbers-check eol-policy-check eol-policy-test line-citations-check line-citations-test ci-least-privilege-check ci-least-privilege-test release-checklist-test analyzer-python-offline-build-test analyzer-python-ratchets-test release-artifact-reproducibility-test sql-native-ratchets sql-native-ratchets-test companion-release-gate public-release-check dogfood-change dogfood-check dogfood-seal dogfood-bind-range dogfood-bind-range-test error-code-ownership-check error-code-ownership-test cem-verify-pr-test host-package-versions-check host-package-versions-test diagnostic-coverage-check go-archive-gate-injection-test
 
 build: go-version
 	GOCACHE=$(CORVINT_GOCACHE) GOTOOLCHAIN=local go build -trimpath -o $(CORVINT_BIN) ./cmd/corvint
@@ -243,6 +243,10 @@ dogfood-change:
 dogfood-check:
 	@test -n "$(BASE)" || { echo "BASE is required" >&2; exit 2; }
 	@script/dogfood-check.sh "$(BASE)"
+
+dogfood-seal:
+	@test -n "$(BASE)" || { echo "BASE is required" >&2; exit 2; }
+	@script/dogfood-seal.sh "$(BASE)"
 
 dogfood-bind-range:
 	@test -n "$(BASE)" || { echo "BASE is required" >&2; exit 2; }
