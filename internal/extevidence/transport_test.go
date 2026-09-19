@@ -209,7 +209,6 @@ func TestCommandTransportFailuresAreClosed(t *testing.T) {
 	repo := newRepository(t)
 	record := writeRecord(t, t.TempDir(), "provider.json", fixture(t, repo.head))
 	saved := commandTimeout
-	commandTimeout = 500 * time.Millisecond
 	t.Cleanup(func() { commandTimeout = saved })
 	absent, _ := json.Marshal([]string{filepath.Join(t.TempDir(), "absent-provider")})
 	unavailable, err := ParseCommand(string(absent))
@@ -230,6 +229,13 @@ func TestCommandTransportFailuresAreClosed(t *testing.T) {
 		{"stderr flood", providerCommand(t, "stderr-flood"), StateInvalid, "command stderr exceeds 65536 bytes"},
 	}
 	for _, c := range cases {
+		// Only the timeout case shortens the bound to observe the kill; the
+		// rest keep the production bound, so a slow start under -race on a
+		// loaded runner cannot turn a decode case into a timeout.
+		commandTimeout = saved
+		if c.name == "timeout" {
+			commandTimeout = 500 * time.Millisecond
+		}
 		started := time.Now()
 		section := Section(context.Background(), repo.index(), []string{c.source}, nil, []string{"pkg/main.go"}, 10)
 		elapsed := time.Since(started)
@@ -249,6 +255,7 @@ func TestCommandTransportFailuresAreClosed(t *testing.T) {
 			t.Errorf("timeout took %s; the process group was not killed at the bound", elapsed)
 		}
 	}
+	commandTimeout = saved
 	// Malformed stdout decodes to exactly the file transport's reason.
 	file := writeRecord(t, t.TempDir(), "bad.json", []byte(malformed))
 	fromFile := Section(context.Background(), repo.index(), []string{file}, nil, nil, 10)["providers"].([]any)[0].(map[string]any)
