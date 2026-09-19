@@ -583,8 +583,13 @@
       "reason": "evidence-backed"
     },
     {
-      "basis": [],
-      "disposition": "unknown",
+      "basis": [
+        {
+          "evidenceId": "evidence:sha256:967fa5048114d3dc8c2f5b6071257552770762d87250a2933741025fa6c45a8e",
+          "relation": "specification"
+        }
+      ],
+      "disposition": "supported",
       "id": "hunk:sha256:bfe4bbe2748f08fcb04b426cd5a4176b01b3d438ab70a1627a145d494d43620a",
       "newRange": {
         "count": 49,
@@ -595,7 +600,7 @@
         "start": 0
       },
       "path": "docs/decisions/0314-work-queue-repository-adoption-2026-09-19.md",
-      "reason": "no-evidence"
+      "reason": "evidence-backed"
     },
     {
       "basis": [
