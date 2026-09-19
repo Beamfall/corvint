@@ -16,7 +16,7 @@ import (
 // under the fixed VPO-V0-022 PATH, so it names `corvint` bare (WQO-V0-047).
 const workAdapterPath = ".corvint/work-queue-adapter"
 
-const workAdapterScript = `#!/bin/bash
+const workAdapterScript = `#!/bin/sh
 # repository-work-queue-adapter/0 written by ` + "`corvint work init`" + `. Corvint runs it
 # with a fixed PATH; install corvint in /opt/homebrew/bin or /usr/local/bin.
 exec corvint work adapter "$@"
@@ -61,6 +61,11 @@ func runWorkInit(_ context.Context, root string, arguments []string, stdout, std
 		return 2
 	}
 	policy, err := workAdoptionPolicy(name)
+	if err != nil {
+		fmt.Fprintln(stderr, "corvint work init:", err)
+		return 2
+	}
+	root, err = resolveQueryRoot(root)
 	if err != nil {
 		fmt.Fprintln(stderr, "corvint work init:", err)
 		return 2

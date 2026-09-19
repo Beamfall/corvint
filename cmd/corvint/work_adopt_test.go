@@ -127,6 +127,50 @@ func TestWorkInitRejectsSymlinkedDirectory(t *testing.T) {
 	}
 }
 
+func TestWorkInitRequiresRepositoryRoot(t *testing.T) {
+	t.Parallel()
+	repository := materializationFixture(t)
+	subdirectory := filepath.Join(repository, "subdirectory")
+	if err := os.Mkdir(subdirectory, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range []string{t.TempDir(), subdirectory} {
+		var stdout, stderr bytes.Buffer
+		if exit := run([]string{"--root", root, "work", "init", "--repository", "fixture"}, strings.NewReader(""), &stdout, &stderr); exit != 2 {
+			t.Fatalf("root %s: init exit=%d stdout=%s stderr=%s", root, exit, &stdout, &stderr)
+		}
+		if _, err := os.Lstat(filepath.Join(root, ".corvint")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("root %s: initialization wrote outside a repository root: %v", root, err)
+		}
+	}
+}
+
+func TestWorkInitUsesPortableAdapterShell(t *testing.T) {
+	t.Parallel()
+	if !strings.HasPrefix(workAdapterScript, "#!/bin/sh\n") {
+		t.Fatalf("generated adapter has non-portable shebang: %q", strings.SplitN(workAdapterScript, "\n", 2)[0])
+	}
+}
+
+func TestWorkMissingAdoptionWorklistIsSourceUnqualified(t *testing.T) {
+	t.Parallel()
+	root := materializationFixture(t)
+	var stdout, stderr bytes.Buffer
+	if exit := run([]string{"--root", root, "work", "init", "--repository", "fixture"}, strings.NewReader(""), &stdout, &stderr); exit != 0 {
+		t.Fatalf("init exit=%d stderr=%s", exit, &stderr)
+	}
+	worklistPath, _ := worklistadapter.WorklistPath(worklistadapter.RepositoryMapping)
+	if err := os.Remove(filepath.Join(root, filepath.FromSlash(worklistPath))); err != nil {
+		t.Fatal(err)
+	}
+	materializationGit(t, root, "add", ".corvint")
+	materializationGit(t, root, "commit", "-qm", "partial adoption")
+	stdout.Reset()
+	stderr.Reset()
+	exit := run([]string{"--root", root, "work", "observe"}, strings.NewReader(""), &stdout, &stderr)
+	workAssertFinalError(t, stdout.Bytes(), exit, "SOURCE_UNQUALIFIED")
+}
+
 func TestWorkInitRollsBackCreatedFiles(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

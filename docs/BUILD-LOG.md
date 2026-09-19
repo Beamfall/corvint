@@ -25,6 +25,16 @@ Pre-landing review reproduced a symlink escape and an interrupted-write residue 
 The repair roots every write with `os.Root`, rejects a symlinked `.corvint`, delays success output,
 and rolls back files created by a failed or racing initialization.
 
+A second independent review found that init still accepted a plain directory or repository
+subdirectory, a partial committed adoption without the worklist surfaced `ADAPTER_FAILED` instead
+of `SOURCE_UNQUALIFIED`, and the generated adapter unnecessarily required Bash. The repair refuses
+non-root targets before writing, preflights the committed adoption worklist with the other source
+inputs, and emits the POSIX-only adapter with `/bin/sh`.
+
+The first canonical-gate attempt after that repair intentionally did not qualify: the release
+artifact conformance test refused the staged repair as a dirty worktree. The repair was committed
+unchanged before rerunning the gate from clean, frozen source.
+
 `TestWorkAdoptedRepositoryWorklist` starts from a clean fixture and runs init, a refused second
 init, commit, observe, and propose-wave over four verification tickets. One is a suite batch, one a
 failure-classification repair, one a test-validity receipt, and one a cleanup/retry that shares

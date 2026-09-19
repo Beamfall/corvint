@@ -575,6 +575,19 @@ func acquireWorkSource(ctx context.Context, root string) (workSource, error) {
 	if err != nil {
 		return result, err
 	}
+	if policy.MappingVersion == worklistadapter.RepositoryMapping {
+		worklistPath, _ := worklistadapter.WorklistPath(policy.MappingVersion)
+		worklistFound := false
+		for i := range source.Entries {
+			if source.Entries[i].Path == worklistPath && source.Entries[i].Mode == "100644" {
+				worklistFound = true
+				break
+			}
+		}
+		if !worklistFound {
+			return result, errors.New("invalid worklist source")
+		}
+	}
 	for i := range source.Entries {
 		if source.Entries[i].Path == policy.AdapterPath {
 			adapterEntry = &source.Entries[i]
