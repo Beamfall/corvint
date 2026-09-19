@@ -3,6 +3,7 @@ package extevidence
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -24,6 +25,13 @@ const (
 	SelectionFull    = "full-relevant-suite-required"
 	SelectionBlocked = "blocked"
 	SelectionUnknown = "unknown"
+)
+
+// The obligation walk is bounded in hops and in entities per record; a walk
+// either bound cuts is reported, never silently dropped (ETS-V1-001).
+const (
+	MaxObligationDepth    = 4
+	MaxObligationEntities = 256
 )
 
 // confidenceUnscored is reported because no record schema carries a
@@ -78,14 +86,17 @@ func ValidSelectionProfile(name string) bool {
 // SelectionInput is what the affected plan contributes. Changed is every
 // changed root path (plan.dirty); Worktree is its uncommitted subset, which no
 // revision-bound record can describe; Incomplete names why the plan scope is
-// not bounded; Mandatory is echoed unchanged (ETS-V0-009).
+// not bounded; Mandatory is echoed unchanged (ETS-V0-009). CheckoutStatus
+// lists a bound checkout's dirty paths; nil leaves every checkout
+// uninspected (ETS-V1-005).
 type SelectionInput struct {
-	Changed    []string
-	Worktree   []string
-	Incomplete []string
-	Mandatory  []any
-	Profile    string
-	Limit      int
+	Changed        []string
+	Worktree       []string
+	Incomplete     []string
+	Mandatory      []any
+	Profile        string
+	Limit          int
+	CheckoutStatus func(ctx context.Context, dir string) ([]string, error)
 }
 
 // obligation is one changed path, affected entity, or widened path that
@@ -112,6 +123,7 @@ type selector struct {
 	selected, excluded []selectionRow
 	blocking           map[string]map[string]any
 	unknowns           []selectionRow
+	checkouts          map[string]string
 	failed             int
 }
 
@@ -121,8 +133,9 @@ type selector struct {
 func Selection(ctx context.Context, dir, revision string, sources []string, checkouts []Checkout, input SelectionInput) map[string]any {
 	root := headRoot(dir, revision)
 	root.changed = input.Changed
-	providers, repository, _ := loadAll(ctx, root, sources, checkouts)
+	providers, repository, bound := loadAll(ctx, root, sources, checkouts)
 	s := newSelector(input)
+	s.inspect(ctx, bound)
 	for _, entry := range providers {
 		if entry.state != StateLoaded {
 			s.failed++
@@ -146,6 +159,30 @@ func newSelector(input SelectionInput) *selector {
 	return s
 }
 
+// inspect reads each resolved checkout's worktree once. A checkout with any
+// dirty path, or one whose status cannot be read, blocks every side it binds
+// (ETS-V1-005, ETS-V1-006).
+func (s *selector) inspect(ctx context.Context, bound *bindings) {
+	s.checkouts = map[string]string{}
+	if s.input.CheckoutStatus == nil || bound == nil {
+		return
+	}
+	for id, entry := range bound.checkouts {
+		if entry.state != "resolved" {
+			continue
+		}
+		dirty, err := s.input.CheckoutStatus(ctx, entry.dir)
+		switch {
+		case err != nil:
+			s.checkouts[id] = "checkout-worktree-unreadable"
+		case len(dirty) != 0:
+			s.checkouts[id] = "checkout-worktree-dirty"
+		default:
+			s.checkouts[id] = ""
+		}
+	}
+}
+
 func stringSet(values []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(values))
 	for _, value := range values {
@@ -155,12 +192,12 @@ func stringSet(values []string) map[string]struct{} {
 }
 
 // add evaluates one loaded record: joins map changed paths to entities,
-// entity relations widen the obligations one hop, and every verification or
+// entity relations widen the obligations transitively, and every verification or
 // context relation on an obligation is selected or excluded with a reason.
 func (s *selector) add(entry provider, v *view) {
 	s.unrooted(v)
 	obligations := s.join(entry, v)
-	s.widen(v, obligations)
+	s.walk(v, obligations)
 	s.widenPaths(v)
 	for id := range obligations {
 		s.entity(v.provider, id)
@@ -207,25 +244,72 @@ func (s *selector) join(entry provider, v *view) map[string]struct{} {
 	return obligations
 }
 
-// widen adds the one-hop downstream entities impact reports; a context or
-// verification relation between entities is not a dependency.
-func (s *selector) widen(v *view, obligations map[string]struct{}) {
-	var reached []string
+// walk widens the obligations breadth-first over provider-declared relations
+// between entities; a context or verification relation between entities is
+// not a dependency. A walk cut by the depth or entity bound blocks the
+// entities at its edge and reports an unknown, so a cut only widens (ETS-V1-001..003).
+func (s *selector) walk(v *view, obligations map[string]struct{}) {
+	adjacent := s.adjacency(v)
+	frontier := sortedKeys(obligations)
+	for depth := 1; ; depth++ {
+		next := reach(adjacent, obligations, frontier)
+		if len(next) == 0 {
+			return
+		}
+		if depth > MaxObligationDepth {
+			s.truncate(v, adjacent, frontier, next, "obligation-depth-truncated", depth-1)
+			return
+		}
+		if len(obligations)+len(next) > MaxObligationEntities {
+			s.truncate(v, adjacent, frontier, next, "obligation-budget-exhausted", depth-1)
+			return
+		}
+		for _, id := range next {
+			obligations[id] = struct{}{}
+		}
+		frontier = next
+	}
+}
+
+// adjacency is the undirected entity graph of v's dependency relations.
+func (s *selector) adjacency(v *view) map[string][]string {
+	adjacent := map[string][]string{}
 	for _, candidate := range v.links {
 		if candidate.from.isPath() || candidate.to.isPath() || s.isTestOrContext(candidate) {
 			continue
 		}
-		_, fromListed := obligations[candidate.from.entity]
-		_, toListed := obligations[candidate.to.entity]
-		if fromListed {
-			reached = append(reached, candidate.to.entity)
-		}
-		if toListed {
-			reached = append(reached, candidate.from.entity)
+		adjacent[candidate.from.entity] = append(adjacent[candidate.from.entity], candidate.to.entity)
+		adjacent[candidate.to.entity] = append(adjacent[candidate.to.entity], candidate.from.entity)
+	}
+	return adjacent
+}
+
+// reach lists, sorted, the entities one hop from frontier not yet obligations.
+func reach(adjacent map[string][]string, obligations map[string]struct{}, frontier []string) []string {
+	found := map[string]struct{}{}
+	for _, id := range frontier {
+		for _, neighbour := range adjacent[id] {
+			found[neighbour] = struct{}{}
 		}
 	}
-	for _, id := range reached {
-		obligations[id] = struct{}{}
+	for id := range obligations {
+		delete(found, id)
+	}
+	return sortedKeys(found)
+}
+
+// truncate blocks each frontier entity that has an unwalked neighbour and
+// reports the cut as an unknown.
+func (s *selector) truncate(v *view, adjacent map[string][]string, frontier, next []string, code string, depth int) {
+	cut := stringSet(next)
+	for _, id := range frontier {
+		if !slices.ContainsFunc(adjacent[id], func(neighbour string) bool { _, open := cut[neighbour]; return open }) {
+			continue
+		}
+		subject := v.provider + ":" + id
+		s.record(s.entity(v.provider, id), code, v.provider, subject)
+		row := map[string]any{"code": code, "provider": v.provider, "entity": subject, "depth": depth, "unwalked": len(next)}
+		s.unknowns = append(s.unknowns, selectionRow{key: v.provider + "\x00" + id + "\x00" + code, row: row})
 	}
 }
 
@@ -449,6 +533,7 @@ func (s *selector) sideCode(entry provider, v *view, side endpoint) string {
 		func() string { return freshnessCode(entry, v, side) },
 		func() string { return verificationCodes[v.verify(side)] },
 		func() string { return s.worktreeCode(v, side) },
+		func() string { return s.checkoutCode(v, side) },
 	)
 }
 
@@ -522,6 +607,31 @@ func (s *selector) worktreeCode(v *view, side endpoint) string {
 		return "worktree-dirty-path"
 	}
 	return ""
+}
+
+// checkoutCode refuses a side bound to a checkout whose worktree was dirty or
+// unreadable: the record describes its commit, not those changes (ETS-V1-005).
+func (s *selector) checkoutCode(v *view, side endpoint) string {
+	state := v.repositories[side.repository]
+	if state == nil || state.binding != BindingCheckout {
+		return ""
+	}
+	return s.checkouts[state.declared.ID]
+}
+
+// inspected drops checkout-worktree-not-inspected once every checkout side of
+// a row had its worktree read (ETS-V1-007).
+func (s *selector) inspected(limits []any, v *view, sides ...endpoint) []any {
+	for _, side := range sides {
+		state := v.repositories[side.repository]
+		if state == nil || state.binding != BindingCheckout {
+			continue
+		}
+		if _, read := s.checkouts[state.declared.ID]; !read {
+			return limits
+		}
+	}
+	return slices.DeleteFunc(limits, func(limit any) bool { return limit == "checkout-worktree-not-inspected" })
 }
 
 // record folds one evaluated relation into an obligation.
@@ -614,7 +724,7 @@ func (s *selector) row(entry provider, v *view, candidate link, side endpoint, e
 		"test":          map[string]any{"path": side.path},
 		"relation":      relationMap(candidate.relation, candidate.structured),
 		"relation_type": candidate.relation.Type, "evidence": candidate.relation.Evidence,
-		"verification": v.verify(side), "limitations": limitations(v, side),
+		"verification": v.verify(side), "limitations": s.inspected(limitations(v, side), v, side),
 	}
 	s.provenance(out, entry, v, side)
 	if code == "" {
@@ -668,7 +778,7 @@ func (s *selector) pathRow(entry provider, v *view, candidate link, code string)
 		"subject":       subjectState.endpointMap(subject, subjectVerification),
 		"relation":      relationMap(candidate.relation, candidate.structured),
 		"relation_type": candidate.relation.Type, "evidence": candidate.relation.Evidence,
-		"verification": testVerification, "limitations": pathLimitations(v, candidate),
+		"verification": testVerification, "limitations": s.inspected(pathLimitations(v, candidate), v, candidate.from, candidate.to),
 		"identity": testState.identity, "binding": testState.binding, "freshness": testState.freshness,
 		"test_revision": testState.declared.Revision, "source_revision": subjectState.declared.Revision,
 		"relation_state":       worse(sideState(testState, testVerification), sideState(subjectState, subjectVerification)),
