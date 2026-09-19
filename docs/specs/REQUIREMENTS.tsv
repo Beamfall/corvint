@@ -327,7 +327,7 @@ CKN-V0-008	docs/specs/compaction-kernel-v0.md	88	`corvint [--root PATH] kernel [
 CKN-V0-009	docs/specs/compaction-kernel-v0.md	96	`corvint host-adapter codex` and `corvint host-adapter claude-code` MUST append
 CRB-V0-001	docs/specs/corvint-rebrand-v0.md	37	The current product display name MUST be `Corvint`, with lowercase slug `corvint
 CRB-V0-002	docs/specs/corvint-rebrand-v0.md	38	The root and repository-owned nested Go modules, active Go self-imports, and ope
-CRB-V0-003	docs/specs/corvint-rebrand-v0.md	39	The main native CLI version output MUST be `Corvint <version>`, the default loca
+CRB-V0-003	docs/specs/corvint-rebrand-v0.md	39	The main native CLI version output MUST be `Corvint <version> (build <N>)` (amen
 CRB-V0-004	docs/specs/corvint-rebrand-v0.md	40	Existing public versioned `corvint-*` wire, schema, receipt, and profile identif
 CRB-V0-005	docs/specs/corvint-rebrand-v0.md	41	`.corvint/change.cem.json` MUST remain the canonical CEM path, and canonical CEM
 CRB-V0-006	docs/specs/corvint-rebrand-v0.md	42	Historical results, receipts, accepted decision facts, third-party notices, prov
