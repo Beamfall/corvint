@@ -35,6 +35,11 @@ The first canonical-gate attempt after that repair intentionally did not qualify
 artifact conformance test refused the staged repair as a dirty worktree. The repair was committed
 unchanged before rerunning the gate from clean, frozen source.
 
+After the final evidence seal, current `main` advanced with the accepted corvid artwork. Merging it
+correctly invalidated the pinned README workflow citation because the themed logo moved that span by
+one line. The canonical gate refused the stale pin; the repair relocates it to
+`README.md:188-198@3297e31e` without changing the cited workflow.
+
 `TestWorkAdoptedRepositoryWorklist` starts from a clean fixture and runs init, a refused second
 init, commit, observe, and propose-wave over four verification tickets. One is a suite batch, one a
 failure-classification repair, one a test-validity receipt, and one a cleanup/retry that shares
