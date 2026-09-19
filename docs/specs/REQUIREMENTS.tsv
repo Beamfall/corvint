@@ -338,12 +338,12 @@ CRB-V0-010	docs/specs/corvint-rebrand-v0.md	49	The private, unpublished OpenCode
 CRB-V0-011	docs/specs/corvint-rebrand-v0.md	53	Every setting has exactly one name (amendment 2026-09-17). An explicitly empty
 CRB-V0-012	docs/specs/corvint-rebrand-v0.md	57	Host package versions MUST advance with renamed shipped content, while existing
 CRB-V0-013	docs/specs/corvint-rebrand-v0.md	61	The VS Code source package MUST use private identity `corvint.corvint-vscode`,
-CRB-V0-014	docs/specs/corvint-rebrand-v0.md	66	The existing brand asset family MUST use a continuous open-route C mark and cust
-CRB-V0-015	docs/specs/corvint-rebrand-v0.md	72	The standalone Console MUST present as `Corvint Console`, build from retained so
-CRB-V0-016	docs/specs/corvint-rebrand-v0.md	80	Standalone builds from the retained MCP and live-provider source packages MUST b
-CRB-V0-017	docs/specs/corvint-rebrand-v0.md	88	Current companion writers MUST emit manifest profile `corvint-companion-bundle/1
-CRB-V0-018	docs/specs/corvint-rebrand-v0.md	109	Runtime settings are read from exactly `CORVINT_CPUPROFILE`,
-CRB-V0-019	docs/specs/corvint-rebrand-v0.md	124	The current core companion writer MUST emit `corvint-companion-bundle/2` with
+CRB-V0-014	docs/specs/corvint-rebrand-v0.md	66	The brand asset family MUST use the corvid silhouette selected by the owner on
+CRB-V0-015	docs/specs/corvint-rebrand-v0.md	74	The standalone Console MUST present as `Corvint Console`, build from retained so
+CRB-V0-016	docs/specs/corvint-rebrand-v0.md	82	Standalone builds from the retained MCP and live-provider source packages MUST b
+CRB-V0-017	docs/specs/corvint-rebrand-v0.md	90	Current companion writers MUST emit manifest profile `corvint-companion-bundle/1
+CRB-V0-018	docs/specs/corvint-rebrand-v0.md	111	Runtime settings are read from exactly `CORVINT_CPUPROFILE`,
+CRB-V0-019	docs/specs/corvint-rebrand-v0.md	126	The current core companion writer MUST emit `corvint-companion-bundle/2` with
 CRR-V0-001	docs/specs/compat-replay-runner-v0.md	50	Descriptor validation, fail-closed before any launch.
 CRR-V0-002	docs/specs/compat-replay-runner-v0.md	133	Environment allow-list, reconciled with the mandatory determinism variables.
 CRR-V0-003	docs/specs/compat-replay-runner-v0.md	144	Process-group containment, its regression, its limit, and its required change.

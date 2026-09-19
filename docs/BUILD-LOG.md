@@ -44,6 +44,30 @@ repository manifest. A scratch-repository probe of the built binary recorded the
 `ERROR/SOURCE_UNQUALIFIED` with no policy, with an uncommitted adoption, and with a tracked
 modification, and `ERROR/ADAPTER_FAILED` when `corvint` is absent from the fixed `PATH`.
 
+## 2026-09-19 CRB-V0-014: owner-selected corvid artwork
+
+The owner selected the first, corvid direction from three generated concepts and then approved
+adoption ("look good. use it"). The chosen silhouette
+was redrawn as editable SVG with a custom lowercase wordmark; the light, dark and universal mark
+and lockup variants share geometry. The README selects a theme-appropriate lockup; the 24 px editor
+icon inherits its host color. `assets/brand/README.md` records usage, raster dimensions and rollback.
+
+Manual asset checks passed: SVG parsing, accessible titles/descriptions, no font or external-image
+dependencies, PNG dimensions/alpha, shared variant geometry and README references. Independent
+Codex review passed with no material findings, including comparison to the selected concept,
+24 px legibility and exact SVG-to-PNG rendering parity. Requirement-index regeneration and focused
+spec-requirement, requirement-definition and decision-number checks passed using an isolated index
+containing the updated spec; `git diff --check` passed. Go/runtime code is unchanged; the full Go
+and release gates were not run for this manual artwork slice, and installed editor qualification
+remains unclaimed.
+
+Pre-change Corvint query ran against `6a423ac091d848b8ac5b49e8002c61c252993ac3`, with three ranked
+results omitted and two test-path candidates withheld. Dirty-Go advice, mutation and retrieval
+evaluations are not applicable. The initial `make dogfood-change` returned `not-complete`
+(`cem-prepare: git-diff-failed`, missing intent scope and outcome input); it is not passing evidence.
+Post-commit CEM/OCM qualification is NOT_PRODUCED for this manual asset slice; native
+CEM's PNG binary-patch limitation remains explicit. Original query, generation prompts and manual
+asset hashes are retained in `/tmp/corvint-logo-20260919/` for this task.
 ## 2026-09-18 EEP-V0 provider-to-impact workflow: synthetic fixture evaluation, and unsupported cases
 
 `TestImpactProviderEvaluation` (`internal/extevidence/extevidence_test.go`) runs the

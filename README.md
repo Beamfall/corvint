@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/brand/corvint-lockup-universal.svg" width="520" alt="Corvint">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/corvint-lockup-dark.svg">
+    <img src="assets/brand/corvint-lockup-light.svg" width="520" alt="Corvint">
+  </picture>
 </p>
 
 <p align="center"><strong>Context your agents can cite. Changes your reviewers can check.</strong></p>
