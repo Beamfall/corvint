@@ -1,25 +1,15 @@
 {
-  "baseRevision": "f870f41b3d5da828f64d1bcf387520d776f4ce86",
+  "baseRevision": "05e17d0a20e845a442f4f8a93206503ca92121ed",
   "evidence": [
     {
-      "blobOid": "32f7fd89221fecbe9cc4d62d85cd5b92bca0c056",
-      "id": "evidence:sha256:1f42c0a3c086d6192b134fe6f794c93143c743f40104cc0fdf1437fd813787b6",
-      "path": "docs/specs/work-queue-observation-v0.md",
+      "blobOid": "2c8404a680a8d3160d4f288dbd1c59a1b616558b",
+      "id": "evidence:sha256:aa1079a129398de44a4dad46f8a7785a72f745e925022f9c48c3a543506d53a1",
+      "path": "docs/specs/go-only-cutover-v0.md",
       "span": {
-        "end": 30466,
-        "start": 30065
+        "end": 6301,
+        "start": 6012
       },
-      "spanSha256": "0ee57a0b739d4cf633b699db7076e92ec27b967cd485fdf4be66fb0062caddb9"
-    },
-    {
-      "blobOid": "55565955d912737d89517692f6fe6283b81c91f3",
-      "id": "evidence:sha256:34900de2918064c42cffac9333bd9a4b635d51b90907e3bb69b395dac5296065",
-      "path": "AGENTS.md",
-      "span": {
-        "end": 5474,
-        "start": 5395
-      },
-      "spanSha256": "49c2c87172e9f7a49e155ae1e8c78fa8bd13cdeee624a0fa0c54738f137a2a14"
+      "spanSha256": "b978292a8c4b51927fd706b54390daf4778412e7a86155dcc64ae13d8ca01832"
     }
   ],
   "excludedPath": ".corvint/change.cem.json",
@@ -27,44 +17,24 @@
     {
       "basis": [
         {
-          "evidenceId": "evidence:sha256:1f42c0a3c086d6192b134fe6f794c93143c743f40104cc0fdf1437fd813787b6",
+          "evidenceId": "evidence:sha256:aa1079a129398de44a4dad46f8a7785a72f745e925022f9c48c3a543506d53a1",
           "relation": "specification"
         }
       ],
       "disposition": "supported",
-      "id": "hunk:sha256:a488dc24eaff037ceaaf0fed877b90fd7ec72a76d4aa0ee3a0792add71387195",
+      "id": "hunk:sha256:f967f91df4fc9c28033382c4ef9c49634327e8a38248769dc6298bcf88f9b611",
       "newRange": {
-        "count": 9,
-        "start": 599
+        "count": 7,
+        "start": 154
       },
       "oldRange": {
-        "count": 8,
-        "start": 599
+        "count": 7,
+        "start": 154
       },
-      "path": "cmd/corvint/work_materialization_test.go",
-      "reason": "evidence-backed"
-    },
-    {
-      "basis": [
-        {
-          "evidenceId": "evidence:sha256:34900de2918064c42cffac9333bd9a4b635d51b90907e3bb69b395dac5296065",
-          "relation": "specification"
-        }
-      ],
-      "disposition": "supported",
-      "id": "hunk:sha256:9b5e6b8df579cc089ff156911946bc489893dc2b70e43984ae98cdac31999c18",
-      "newRange": {
-        "count": 8,
-        "start": 13
-      },
-      "oldRange": {
-        "count": 5,
-        "start": 13
-      },
-      "path": "docs/agent-memory/tests.md",
+      "path": "cmd/corvint/native_hook_test.go",
       "reason": "evidence-backed"
     }
   ],
-  "patchSha256": "67c288406db06da8906d12103ad3c527a0ea5f3da96b7694443dfa0c0751bc20",
+  "patchSha256": "2a01fe854e0a674f03d4c54505b611f2bc8566a99f78f041853a759290b7b591",
   "spec": "cem/0.2"
 }
