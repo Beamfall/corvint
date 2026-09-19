@@ -599,8 +599,9 @@ func TestWorkScriptRejectsCallerScratch(t *testing.T) {
 				t.Fatal("poisoned scratch unexpectedly completed")
 			}
 			workKillGroup(command)
-			if !reflect.DeepEqual(beforeCaller, materializationManifest(t, caller)) || !reflect.DeepEqual(beforeCommon, materializationManifest(t, common)) {
-				t.Fatal("script wrote caller or shared Git metadata")
+			afterCaller, afterCommon := materializationManifest(t, caller), materializationManifest(t, common)
+			if !reflect.DeepEqual(beforeCaller, afterCaller) || !reflect.DeepEqual(beforeCommon, afterCommon) {
+				t.Fatalf("script wrote caller or shared Git metadata:\ncaller %v -> %v\ncommon %v -> %v", beforeCaller, afterCaller, beforeCommon, afterCommon)
 			}
 			raw, err := os.ReadFile(witness)
 			if kind != "ambient-target" {
