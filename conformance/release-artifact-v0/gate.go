@@ -166,7 +166,11 @@ func checkCommit(ctx context.Context, root string, report *Report) error {
 	if err != nil {
 		return err
 	}
-	report.Commit, report.Tree = commit, tree
+	build, err := buildNumber(ctx, root, "HEAD")
+	if err != nil {
+		return err
+	}
+	report.Commit, report.Tree, report.build = commit, tree, build
 	if status != "" {
 		report.fail(reasonDirtyTree, "", "worktree is dirty:\n"+status)
 	}
@@ -251,7 +255,7 @@ func buildTarget(ctx context.Context, options Options, manifest Manifest, target
 	first := filepath.Join(options.Output, "build-a", name)
 	second := filepath.Join(options.Output, "build-b", name)
 	entry.Artifact = first
-	if err := runBuildPair(ctx, options, manifest, target, first, second); err != nil {
+	if err := runBuildPair(ctx, options, manifest, target, report.build, first, second); err != nil {
 		entry.Smoke.Reason = "target did not build"
 		report.fail(reasonBuildFailed, target.id(), err.Error())
 		return entry, nil
@@ -266,13 +270,13 @@ func buildTarget(ctx context.Context, options Options, manifest Manifest, target
 	return finishTarget(ctx, options, manifest, target, entry, report)
 }
 
-func runBuildPair(ctx context.Context, options Options, manifest Manifest, target Target, first, second string) error {
+func runBuildPair(ctx context.Context, options Options, manifest Manifest, target Target, build, first, second string) error {
 	suffix := target.GOOS + "-" + target.GOARCH
-	if err := buildOnce(ctx, options.Root, manifest, target, first,
+	if err := buildOnce(ctx, options.Root, manifest, target, build, first,
 		filepath.Join(options.Output, "cache-a-"+suffix), filepath.Join(options.Output, "tmp-a-"+suffix)); err != nil {
 		return fmt.Errorf("build A: %w", err)
 	}
-	if err := buildOnce(ctx, options.Root, manifest, target, second,
+	if err := buildOnce(ctx, options.Root, manifest, target, build, second,
 		filepath.Join(options.Output, "cache-b-"+suffix), filepath.Join(options.Output, "tmp-b-"+suffix)); err != nil {
 		return fmt.Errorf("build B: %w", err)
 	}
@@ -311,7 +315,7 @@ func finishTarget(ctx context.Context, options Options, manifest Manifest, targe
 	if !entry.Native {
 		return entry, nil
 	}
-	entry.Smoke = smokeTest(ctx, entry.Artifact, manifest.Smoke, options.Output)
+	entry.Smoke = smokeTest(ctx, entry.Artifact, manifest.Smoke, report.build, options.Output)
 	if entry.Smoke.Status == statusFail {
 		report.fail(reasonSmokeFailed, target.id(), entry.Smoke.Reason)
 	}

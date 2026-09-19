@@ -18,15 +18,25 @@ import (
 // buildOnce runs one same-profile build into its own output path with its own
 // build cache and temporary directory. Two builds sharing a cache would prove
 // only that the cache was reused, so each build gets a cold cache.
-func buildOnce(ctx context.Context, root string, manifest Manifest, target Target, output, cache, temporary string) error {
+// buildNumber is the first-parent commit count of revision: every commit on main
+// carries a new, larger build number (PUB-V0-021).
+func buildNumber(ctx context.Context, root, revision string) (string, error) {
+	return gitOutput(ctx, root, "rev-list", "--count", "--first-parent", revision)
+}
+
+// buildArguments is the go build argv for the profile, stamping build into main.build.
+func buildArguments(manifest Manifest, build, output string) []string {
+	arguments := append([]string{"build"}, manifest.Profile.BuildFlags...)
+	return append(arguments, "-ldflags=-X main.build="+build, "-o", output, manifest.Profile.Package)
+}
+
+func buildOnce(ctx context.Context, root string, manifest Manifest, target Target, build, output, cache, temporary string) error {
 	for _, directory := range []string{cache, temporary} {
 		if err := os.MkdirAll(directory, 0o700); err != nil {
 			return err
 		}
 	}
-	arguments := append([]string{"build"}, manifest.Profile.BuildFlags...)
-	arguments = append(arguments, "-o", output, manifest.Profile.Package)
-	command := exec.CommandContext(ctx, "go", arguments...)
+	command := exec.CommandContext(ctx, "go", buildArguments(manifest, build, output)...)
 	command.Dir = root
 	command.Env = buildEnvironment(manifest, target, cache, temporary)
 	var stderr bytes.Buffer

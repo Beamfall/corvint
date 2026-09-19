@@ -323,7 +323,7 @@ Global options:
                possible. Query validates all query options before resolving symlinks
                or requiring .git; init, adopt, and impact require .git up front;
                cem validates the repository at its frozen precedence stage.
-  --version    Print the Corvint version.
+  --version    Print the Corvint version and build number.
   --help       Print this help on stdout and exit 0.
 
 Support boundary:

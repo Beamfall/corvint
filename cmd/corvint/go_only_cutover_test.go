@@ -28,7 +28,7 @@ func TestGoOnlySourceAndVersion(t *testing.T) {
 		t.Fatalf("GOC-V0-001 VERSION: %q %v", version, err)
 	}
 	output, err := candidateCommand("--version").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "Corvint "+strings.TrimSpace(string(version)) {
+	if err != nil || strings.TrimSpace(string(output)) != "Corvint "+strings.TrimSpace(string(version))+" (build 0)" {
 		t.Fatalf("GOC-V0-001 native version: %q %v", output, err)
 	}
 	workflows, err := filepath.Glob(filepath.Join(root, ".github", "workflows", "*.y*ml"))

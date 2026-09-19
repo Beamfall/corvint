@@ -160,7 +160,11 @@ func testCorvintHostArchivePartialProof(t *testing.T) {
 	if count != 6 {
 		t.Fatalf("members=%d", count)
 	}
-	smoke := smokeTest(ctx, extracted, manifest.Smoke, scratch)
+	build, err := buildNumber(ctx, root, state.commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	smoke := smokeTest(ctx, extracted, manifest.Smoke, build, scratch)
 	if smoke.Status != statusPass || !smoke.RepositoryUnchanged {
 		t.Fatalf("extracted smoke: %+v", smoke)
 	}

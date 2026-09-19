@@ -10,7 +10,7 @@ const MAX_EXECUTABLE_BYTES = 256 * 1024 * 1024;
 const STDERR_LIMIT = 65_536;
 const VERSION_TOKEN = "((?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:(?:a|b|rc)(?:0|[1-9][0-9]*)|-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?)";
 const VERSION_PATTERNS: Readonly<Record<CliKind, RegExp>> = {
-  corvint: new RegExp(`^Corvint ${VERSION_TOKEN}\\n$`),
+  corvint: new RegExp(`^Corvint ${VERSION_TOKEN} \\(build (?:0|[1-9][0-9]*)\\)\\n$`),
 };
 
 export type CliKind = "corvint";
