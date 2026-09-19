@@ -18,7 +18,7 @@ printf 'one\ntwo\n' > "$repo/doc.md"
 cat > "$test_root/bin/corvint" <<'EOF'
 #!/usr/bin/env bash
 set -eu
-if [[ $1 == --version ]]; then printf 'Corvint 0.4.0a4\n'; exit 0; fi
+if [[ $1 == --version ]]; then printf 'Corvint 0.4.0a4 (build 12)\n'; exit 0; fi
 root=$2 action="$3 $4"
 printf '%s\n' "$action" >> "$DOGFOOD_TEST_LOG"
 case $action in

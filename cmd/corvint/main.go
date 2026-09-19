@@ -1037,7 +1037,7 @@ func runContext(ctx context.Context, arguments []string, stdin io.Reader, stdout
 		return 0
 	}
 	if options.version {
-		_, _ = fmt.Fprintln(stdout, "Corvint "+version)
+		_, _ = fmt.Fprintln(stdout, "Corvint "+version+" (build "+build+")")
 		return 0
 	}
 	if options.command == "query" {
@@ -1467,3 +1467,7 @@ func providerSource(name, value string, selected int) (string, error) {
 	}
 	return source, nil
 }
+
+// build is the first-parent commit count of the built commit, stamped with
+// -ldflags "-X main.build=N" (PUB-V0-021). An unstamped build reports 0.
+var build = "0"

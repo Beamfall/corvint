@@ -85,7 +85,7 @@ resolve_corvint_bin() {
     return
   fi
   run_child "$run_tmp/corvint-version.stdout" "$run_tmp/corvint-version.stderr" "$corvint_bin" --version
-  if [[ $child_status -ne 0 || $(cat "$run_tmp/corvint-version.stdout") != "Corvint $expected_version" ]]; then
+  if [[ $child_status -ne 0 || ! $(cat "$run_tmp/corvint-version.stdout") =~ ^"Corvint $expected_version (build "(0|[1-9][0-9]*)")"$ ]]; then
     refuse "corvint-version-mismatch expected=$expected_version"
   fi
 }

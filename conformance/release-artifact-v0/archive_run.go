@@ -241,8 +241,11 @@ func archiveBuildOnce(ctx context.Context, source, gitDirectory, commit string, 
 	if err := initializeBuildIndex(ctx, source, gitDirectory, commit, temporary); err != nil {
 		return err
 	}
-	arguments := append([]string{"build"}, manifest.Profile.BuildFlags...)
-	arguments = append(arguments, "-o", output, manifest.Profile.Package)
+	build, err := closedGit(ctx, source, temporary, "--git-dir="+gitDirectory, "rev-list", "--count", "--first-parent", commit)
+	if err != nil {
+		return err
+	}
+	arguments := buildArguments(manifest, strings.TrimSpace(string(build)), output)
 	environment := archiveBuildEnvironment(manifest, target, source, gitDirectory, cache, temporary)
 	_, stderr, err := runContained(ctx, "go", arguments, environment, source)
 	if err != nil {

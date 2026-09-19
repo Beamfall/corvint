@@ -159,8 +159,9 @@ visible `UNSUPPORTED_PLATFORM`.
 - **VSC-V0-007.** A candidate qualifies only after `lstat`, `realpath`, and `stat` establish one
 existing regular executable file; its real path and containing directory are absolute; its byte
 size is at most 256 MiB; its complete bytes have been SHA-256 hashed; and a bounded direct
-`--version` probe exits zero with empty stderr and exactly one UTF-8 line `Corvint <version>\n` for
-`corvint` or `corvint`.
+`--version` probe exits zero with empty stderr and exactly one UTF-8 line
+`Corvint <version> (build <build>)\n` for `corvint`, where `<build>` is `0|[1-9][0-9]*` (PUB-V0-021).
+The build number is not part of the pin; the executable digest already distinguishes builds.
 `version` is at most 64 ASCII bytes and matches exactly:
 
 ```text

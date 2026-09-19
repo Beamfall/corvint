@@ -87,7 +87,7 @@ cat > "$test_root/bin/corvint" <<'EOF'
 #!/usr/bin/env bash
 set -eu
 if [[ ${1:-} == --version ]]; then
-  printf 'Corvint 0.4.0a4\n'
+  printf 'Corvint 0.4.0a4 (build 12)\n'
   exit 0
 fi
 root=$2
@@ -296,7 +296,7 @@ cat > "$test_root/bin/disagree-corvint" <<'EOF'
 #!/usr/bin/env bash
 set -eu
 if [[ ${1:-} == --version ]]; then
-  printf 'Corvint 0.4.0a4\n'
+  printf 'Corvint 0.4.0a4 (build 12)\n'
   exit 0
 fi
 printf '{"different":true}\n'
@@ -929,7 +929,7 @@ cat > "$test_root/bin/slow-check-corvint" <<'EOF'
 #!/usr/bin/env bash
 set -u
 if [[ ${1:-} == --version ]]; then
-  printf 'Corvint 0.4.0a4\n'
+  printf 'Corvint 0.4.0a4 (build 12)\n'
   exit 0
 fi
 if [[ $3 == cem ]]; then
@@ -974,7 +974,7 @@ cat > "$test_root/bin/slow-corvint" <<'EOF'
 #!/usr/bin/env bash
 set -u
 if [[ ${1:-} == --version ]]; then
-  printf 'Corvint 0.4.0a4\n'
+  printf 'Corvint 0.4.0a4 (build 12)\n'
   exit 0
 fi
 sleep 30 &

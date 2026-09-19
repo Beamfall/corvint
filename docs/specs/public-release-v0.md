@@ -5,7 +5,7 @@ Date: 2026-09-12
 Requirement prefix: `PUB-V0`  
 Intent status: accepted owner scope; implementation details proposed  
 Delivery status: not qualified  
-Amendments: decision 0167 (build from the staged export; retained bundle archive) amends `PUB-V0-013..015`
+Amendments: decision 0167 (build from the staged export; retained bundle archive) amends `PUB-V0-013..015`; decision 0314 adds `PUB-V0-021` (build number)
 
 ## Agent digest
 - Claim: A public alpha ships the Go CLI, MCP docs, agent/editor unit and E2E test tracking, and an optional dashboard and task manager with a roadmap.
@@ -241,6 +241,13 @@ The result binds the archive SHA-256 and frozen Corvint commit/tree. Existing ou
   authority or test adequacy. The checker MUST be built by exact Go 1.27.1 from the clean frozen
   source revision. Every required row must bind its original bounded evidence and exact fixture,
   archive, source and tool identities; unknowns retain their labels.
+- `PUB-V0-021`: Every new Corvint version created on main MUST carry a new build number (owner
+  instruction 2026-09-19, decision 0314). The build number is the first-parent commit count of the
+  built commit, stamped with `-ldflags "-X main.build=N"` by `make build`, the loose archive gate and
+  the archive build, so each merge to main raises it by at least one without a hand-edited file.
+  `corvint --version` prints `Corvint <VERSION> (build N)`; an unstamped `go build` reports build
+  `0`. The release smoke MUST require the exact stamped number, and the VS Code version probe and
+  the dogfood coordinators MUST require the `(build N)` suffix while keeping `VERSION` as the pin.
 
 ### PUB-V0-020 foreground JS acceptance design
 
@@ -503,6 +510,7 @@ with named versions stays a separate, not-yet-exercised step that this command d
 | PUB-V0-014 | `internal/companionrelease/archive.go`, `internal/companionrelease/verify.go`, `internal/companionrelease/manifest.go`, `internal/companionrelease/packages.go`, `internal/companionrelease/companionrelease.go` | Existing archive tests plus shared-source/manifest-reference and exact exported host-package-tree tests in `internal/companionrelease`. |
 | PUB-V0-015 | `internal/companionrelease/smoke.go`, `internal/companionrelease/workflow_smoke.go`, `internal/companionrelease/retain.go`, `internal/companionrelease/companionrelease.go`, `internal/companionrelease/proc.go` | Existing installed smoke/process tests plus `TestMCPDiscoveryRequiresExactProtocolAndIdentity` and `TestRetainedSmokeReportBindsArchiveOutsideArchive`; the retained exact-binary run remains the final companion gate. |
 | PUB-V0-016 | `extensions/vscode/test/installed`, `conformance/interactive-alpha`, `internal/companionrelease/installed.go`, `cmd/corvint-public-release-check`, `script/public-release-check` | retained verifier, no-overwrite and wrapper refusal tests; the final exact retained installed run remains required. |
+| PUB-V0-021 | `cmd/corvint/main.go` (`build`), `Makefile` (`build`), `conformance/release-artifact-v0/build.go` (`buildNumber`, `buildArguments`), `conformance/release-artifact-v0/archive_run.go`, `extensions/vscode/src/executable.ts`, `script/dogfood-change.sh`, `script/dogfood-check.sh`, `script/dogfood-bind-range.sh` | `TestSmokeTestExecutesRealSubprocessAndDetectsFailures` (missing and wrong build numbers fail), `TestGoOnlySourceAndVersion` (unstamped build 0), `TestCorvintHostArchivePartialProof` (extracted archive smoke requires the exact first-parent count), `version probe requires the build number (VSC-V0-007 PUB-V0-021)` |
 
 ## Core release scope amendment (2026-09-16)
 

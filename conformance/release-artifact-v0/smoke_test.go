@@ -64,7 +64,7 @@ func TestSmokeTestExecutesRealSubprocessAndDetectsFailures(t *testing.T) {
 		check   func(t *testing.T, report SmokeReport)
 	}{
 		{
-			name: "genuine pass", version: "Stub 1.0.0",
+			name: "genuine pass", version: "Stub 1.0.0 (build 7)",
 			output: `{"context":{"intent":{"id":"fixture-intent"}}}`,
 			check: func(t *testing.T, report SmokeReport) {
 				if report.Status != statusPass || !report.RepositoryUnchanged || !report.QueryOK {
@@ -73,7 +73,7 @@ func TestSmokeTestExecutesRealSubprocessAndDetectsFailures(t *testing.T) {
 			},
 		},
 		{
-			name: "wrong version banner fails", version: "Stub 9.9.9",
+			name: "missing build number fails", version: "Stub 1.0.0",
 			output: `{"context":{"intent":{"id":"fixture-intent"}}}`,
 			check: func(t *testing.T, report SmokeReport) {
 				if report.Status != statusFail || !strings.Contains(report.Reason, "version banner") {
@@ -82,7 +82,25 @@ func TestSmokeTestExecutesRealSubprocessAndDetectsFailures(t *testing.T) {
 			},
 		},
 		{
-			name: "wrong resolved intent fails", version: "Stub 1.0.0",
+			name: "wrong build number fails", version: "Stub 1.0.0 (build 6)",
+			output: `{"context":{"intent":{"id":"fixture-intent"}}}`,
+			check: func(t *testing.T, report SmokeReport) {
+				if report.Status != statusFail || !strings.Contains(report.Reason, "version banner") {
+					t.Fatalf("expected a version-banner failure, got %+v", report)
+				}
+			},
+		},
+		{
+			name: "wrong version banner fails", version: "Stub 9.9.9 (build 7)",
+			output: `{"context":{"intent":{"id":"fixture-intent"}}}`,
+			check: func(t *testing.T, report SmokeReport) {
+				if report.Status != statusFail || !strings.Contains(report.Reason, "version banner") {
+					t.Fatalf("expected a version-banner failure, got %+v", report)
+				}
+			},
+		},
+		{
+			name: "wrong resolved intent fails", version: "Stub 1.0.0 (build 7)",
 			output: `{"context":{"intent":{"id":"other"}}}`,
 			check: func(t *testing.T, report SmokeReport) {
 				if report.Status != statusFail || report.QueryOK {
@@ -91,7 +109,7 @@ func TestSmokeTestExecutesRealSubprocessAndDetectsFailures(t *testing.T) {
 			},
 		},
 		{
-			name: "repository mutation fails", version: "Stub 1.0.0",
+			name: "repository mutation fails", version: "Stub 1.0.0 (build 7)",
 			output: `{"context":{"intent":{"id":"fixture-intent"}}}`, mutate: true,
 			check: func(t *testing.T, report SmokeReport) {
 				if report.Status != statusFail || !strings.Contains(report.Reason, "mutated") {
@@ -110,7 +128,7 @@ func TestSmokeTestExecutesRealSubprocessAndDetectsFailures(t *testing.T) {
 			} else {
 				t.Setenv("SMOKE_MUTATE", "")
 			}
-			report := smokeTest(context.Background(), binary, smoke, t.TempDir())
+			report := smokeTest(context.Background(), binary, smoke, "7", t.TempDir())
 			testCase.check(t, report)
 		})
 	}

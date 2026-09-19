@@ -22,13 +22,14 @@ func isNative(target Target) bool {
 
 // smokeTest runs the two required executions: the version banner and one real
 // read-only query, proving the query left the repository unchanged.
-func smokeTest(ctx context.Context, binary string, smoke Smoke, workspace string) SmokeReport {
+func smokeTest(ctx context.Context, binary string, smoke Smoke, build, workspace string) SmokeReport {
+	banner := smoke.ExpectedVersion + " (build " + build + ")"
 	version, err := runCaptured(ctx, binary, smoke.VersionArgument)
 	if err != nil {
 		return SmokeReport{Status: statusFail, Reason: fmt.Sprintf("%s failed: %v", smoke.VersionArgument, err)}
 	}
-	if strings.TrimSpace(version) != smoke.ExpectedVersion {
-		return SmokeReport{Status: statusFail, Reason: fmt.Sprintf("version banner %q want %q", strings.TrimSpace(version), smoke.ExpectedVersion)}
+	if strings.TrimSpace(version) != banner {
+		return SmokeReport{Status: statusFail, Reason: fmt.Sprintf("version banner %q want %q", strings.TrimSpace(version), banner)}
 	}
 	fixture, err := makeQueryFixture(ctx, workspace, smoke)
 	if err != nil {

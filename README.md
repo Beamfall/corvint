@@ -122,7 +122,7 @@ Install the binary to use Corvint in any supported Git repository:
 
 ```console
 mkdir -p "$HOME/.local/bin"
-GOTOOLCHAIN=local go build -o "$HOME/.local/bin/corvint" ./cmd/corvint
+GOTOOLCHAIN=local go build -ldflags "-X main.build=$(git rev-list --count --first-parent HEAD)" -o "$HOME/.local/bin/corvint" ./cmd/corvint
 export PATH="$HOME/.local/bin:$PATH"
 corvint --version
 ```
